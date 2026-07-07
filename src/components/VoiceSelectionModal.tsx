@@ -10,7 +10,8 @@ import {
   Sparkles, 
   Mic, 
   UserRound,
-  Info
+  Info,
+  Search
 } from "lucide-react";
 import { VoiceOption } from "../App";
 
@@ -62,7 +63,23 @@ export default function VoiceSelectionModal({
 }: VoiceSelectionModalProps) {
   const [selectedId, setSelectedId] = useState<string>(currentVoiceId);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const playTimerRef = useRef<number | null>(null);
+
+  const filteredVoices = voices.filter((voice) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const accent = ACCENT_MAPPING[voice.id] || "";
+    return (
+      voice.name.toLowerCase().includes(q) ||
+      voice.actor.toLowerCase().includes(q) ||
+      voice.style.toLowerCase().includes(q) ||
+      voice.movieReference.toLowerCase().includes(q) ||
+      voice.description.toLowerCase().includes(q) ||
+      voice.gender.toLowerCase().includes(q) ||
+      accent.toLowerCase().includes(q)
+    );
+  });
 
   // Sync state with prop if it changes
   useEffect(() => {
@@ -191,10 +208,41 @@ export default function VoiceSelectionModal({
           </button>
         </div>
 
+        {/* Search Bar */}
+        <div className="px-6 pt-4 pb-2 border-b border-white/5 bg-slate-950/20">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search voices by name, style, actor, or movie..."
+              className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-9 pr-9 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/40 focus:border-indigo-500/40 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-500 mt-1.5 pl-1">
+            {filteredVoices.length} of {voices.length} voices
+          </p>
+        </div>
+
         {/* Modal Body / Voice Grid */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+          {filteredVoices.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search className="w-8 h-8 text-slate-600 mb-3" />
+              <p className="text-sm text-slate-400">No voices match "{searchQuery}"</p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {voices.map((voice) => {
+            {filteredVoices.map((voice) => {
               const isSelected = selectedId === voice.id;
               const isPlaying = playingId === voice.id;
               const accent = ACCENT_MAPPING[voice.id] || "Global Accent";
@@ -292,6 +340,7 @@ export default function VoiceSelectionModal({
               );
             })}
           </div>
+          )}
         </div>
 
         {/* Modal Footer */}
