@@ -624,7 +624,7 @@ export default function App() {
   }, [isMuted]);
 
   // Microphone audio capture setup
-  const { start: startMic, stop: stopMic, isRecording } = useMicrophone({
+  const { start: startMic, stop: stopMic, isRecording, error: micError } = useMicrophone({
     onAudioChunk: handleMicrophoneChunk,
     onStart: () => {
       addLog("system", "microphone_active", "Audio stream transmitting at 16kHz Mono PCM.");
@@ -643,6 +643,21 @@ export default function App() {
       stopPlayback();
     }
   }, [callState, startMic, stopMic, stopPlayback]);
+
+  // Surface microphone failures loudly instead of silently swallowing them.
+  // A call was previously able to show "connected" while zero audio was ever
+  // captured (permission denied, no device, or blocked in an embedded iframe
+  // preview context), with the failure only visible in the browser devtools
+  // console and never in the app UI itself.
+  useEffect(() => {
+    if (micError) {
+      addLog("system", "microphone_error", micError);
+      if (callState === "active") {
+        setCallState("ended");
+        addLog("system", "call_ended_mic_failure", "Call ended: microphone was unavailable, so Gemini never received any audio.");
+      }
+    }
+  }, [micError]);
 
   // Sync AI voice player state with our Pipeline status indicator
   useEffect(() => {
