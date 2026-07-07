@@ -187,6 +187,43 @@ export default function ThreeDotMenuModal({
     fetchTranscript();
   }, [selectedCall, authToken]);
 
+  // Fetch the last completed conversation for whichever contact is currently selected,
+  // so the operator can see exactly what the AI will "remember" on the next call.
+  interface ConversationMemory {
+    callSessionId: string;
+    endedAt: string;
+    transcript: TranscriptMessage[];
+  }
+  const [lastConversationMemory, setLastConversationMemory] = useState<ConversationMemory | null>(null);
+  const [lastConversationLoading, setLastConversationLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedContactId) {
+      setLastConversationMemory(null);
+      return;
+    }
+
+    const fetchLastConversation = async () => {
+      setLastConversationLoading(true);
+      try {
+        const response = await fetch(`/api/contacts/${selectedContactId}/last-conversation`, {
+          headers: {
+            "Authorization": `Bearer ${authToken}`
+          }
+        });
+        const data = await response.json();
+        setLastConversationMemory(data.success ? data.memory : null);
+      } catch (err) {
+        console.error("Failed to fetch last conversation for contact:", err);
+        setLastConversationMemory(null);
+      } finally {
+        setLastConversationLoading(false);
+      }
+    };
+
+    fetchLastConversation();
+  }, [selectedContactId, authToken]);
+
   if (!isOpen) return null;
 
   // Filter contacts
@@ -589,6 +626,41 @@ export default function ThreeDotMenuModal({
                     })
                   )}
                 </div>
+
+                {/* Last conversation memory preview for the selected contact -- this is
+                    exactly what the AI recalls automatically when this contact is called back. */}
+                {selectedContactId && (
+                  <div className="bg-black/20 border border-white/5 rounded-2xl p-4 space-y-2">
+                    <span className="text-[9px] font-mono font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                      <MessageSquare className="w-3 h-3 text-indigo-400" />
+                      Last Conversation Memory
+                    </span>
+                    {lastConversationLoading ? (
+                      <p className="text-[11px] text-slate-500 italic">Loading previous conversation...</p>
+                    ) : lastConversationMemory && lastConversationMemory.transcript.length > 0 ? (
+                      <>
+                        <p className="text-[10px] text-slate-500 font-mono">
+                          {new Date(lastConversationMemory.endedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                        </p>
+                        <div className="max-h-[140px] overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                          {lastConversationMemory.transcript.slice(-6).map((m, i) => (
+                            <p key={i} className="text-[11px] text-slate-300 leading-snug">
+                              <span className={`font-bold ${m.speaker === "AI" ? "text-indigo-400" : "text-slate-400"}`}>
+                                {m.speaker}:
+                              </span>{" "}
+                              {m.message}
+                            </p>
+                          ))}
+                        </div>
+                        <p className="text-[9px] text-slate-600 italic pt-1">
+                          The AI will use this to pick up naturally on the next call with this contact.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-slate-500 italic">No previous calls with this contact yet.</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
