@@ -617,20 +617,35 @@ async function startServer() {
 
         const augmentedPrompt = `${resolvedPrompt}\n\nCRITICAL PHONE CALL GUIDELINES:\n1. You are in a direct, real-time live phone call. \n2. NEVER mention or reference your "system prompt", "instructions", "instructions provided", "context", "prompt setup", "scenario description", "guidelines", or "roleplay". \n3. NEVER say things like "Based on your prompt", "According to the instructions", "In this scenario", or "Since you instructed me to". \n4. Stay 100% in character naturally from the very first word. Respond directly and authentically as if the situation is entirely real and happening live, with no meta-commentary about being an AI following a prompt.\n5. Keep your speech warm, natural, and highly conversational, designed for oral communication.${memoryBlock}`;
 
+        // Maps each persona shown in the UI (VOICES in src/App.tsx) to one of Gemini's
+        // 30 real prebuilt TTS voices. Previously several personas silently collapsed onto
+        // the SAME underlying voice (Zephyr/Orion/Ursa/Capella all reused Puck/Charon/Kore/
+        // Aoede) which is why multiple "different" voices sounded identical. Every entry
+        // below is now a distinct real Gemini voice, picked to match that persona's style:
+        //   Samantha (sultry/soothing)  -> Sulafat    (Warm, female)
+        //   Red (deep/sage)             -> Charon     (Informative, male)
+        //   Wade (witty/sarcastic)      -> Puck       (Upbeat, male)
+        //   Bruce (gravelly/intense)    -> Algenib    (Gravelly, male)
+        //   Mia (bright/bubbly)         -> Laomedeia  (Upbeat, female)
+        //   Cooper (laid-back/smooth)   -> Algieba    (Smooth, male)
+        //   Orion (earnest/warm)        -> Achird     (Friendly, male)
+        //   Ursa (elegant/poised)       -> Gacrux     (Mature, female)
+        //   Anna (sunny/optimistic)     -> Zephyr     (Bright, female)
+        const PERSONA_VOICE_MAP: Record<string, string> = {
+          kore: "Sulafat",
+          charon: "Charon",
+          puck: "Puck",
+          fenrir: "Algenib",
+          aoede: "Laomedeia",
+          zephyr: "Algieba",
+          orion: "Achird",
+          ursa: "Gacrux",
+          capella: "Zephyr"
+        };
+
         const mapVoice = (vId: string): string => {
           const lower = (vId || "").toLowerCase();
-          if (["puck", "charon", "kore", "fenrir", "aoede"].includes(lower)) {
-            if (lower === "puck") return "Puck";
-            if (lower === "charon") return "Charon";
-            if (lower === "kore") return "Kore";
-            if (lower === "fenrir") return "Fenrir";
-            if (lower === "aoede") return "Aoede";
-          }
-          if (lower === "zephyr") return "Puck";
-          if (lower === "orion") return "Charon";
-          if (lower === "ursa") return "Kore";
-          if (lower === "capella") return "Aoede";
-          return "Aoede";
+          return PERSONA_VOICE_MAP[lower] || "Puck";
         };
 
         const targetVoice = mapVoice(resolvedVoice);
