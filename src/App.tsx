@@ -31,7 +31,6 @@ import { getSupabase } from "./lib/supabase";
 import AuthScreen from "./components/AuthScreen";
 import UserProfileModal from "./components/UserProfileModal";
 import AdminConsole from "./components/AdminConsole";
-import ContactManager from "./components/ContactManager";
 import CallHistoryDrawer from "./components/CallHistoryDrawer";
 import AiCommandMode from "./components/AiCommandMode";
 import LiveTranscriptView from "./components/LiveTranscriptView";
