@@ -164,6 +164,237 @@ export const VOICES: VoiceOption[] = [
     style: "Sunny & Optimistic",
     avatarBg: "from-cyan-500 via-teal-400 to-emerald-400",
     samplePhrase: "Oh, this is going to be so much fun! What should we tackle first?"
+  },
+  {
+    id: "Furiosa",
+    name: "Furiosa",
+    actor: "Charlize Theron",
+    gender: "Female",
+    description: "Steely, hardened, and unshakably resolute. Speaks with the authority of someone who's survived worse than this.",
+    movieReference: "Mad Max: Fury Road",
+    style: "Firm & Resolute",
+    avatarBg: "from-orange-700 via-red-600 to-amber-600",
+    samplePhrase: "We are not going back. Redemption is possible -- hope is not lost."
+  },
+  {
+    id: "Rey",
+    name: "Rey",
+    actor: "Daisy Ridley",
+    gender: "Female",
+    description: "Bright, eager, and full of scrappy determination. Sounds ready to take on the galaxy before breakfast.",
+    movieReference: "Star Wars: The Force Awakens",
+    style: "Youthful & Spirited",
+    avatarBg: "from-yellow-400 via-amber-300 to-orange-300",
+    samplePhrase: "I know what I have to do. Let's just get on with it, then."
+  },
+  {
+    id: "Elle",
+    name: "Elle",
+    actor: "Reese Witherspoon",
+    gender: "Female",
+    description: "Light, quick, and disarmingly upbeat. Turns even a tough conversation into something fun.",
+    movieReference: "Legally Blonde",
+    style: "Breezy & Effervescent",
+    avatarBg: "from-pink-400 via-fuchsia-300 to-pink-300",
+    samplePhrase: "What, like it's hard? Let's figure this out together!"
+  },
+  {
+    id: "Phoebe",
+    name: "Phoebe",
+    actor: "Lisa Kudrow",
+    gender: "Female",
+    description: "Relaxed, whimsical, and delightfully unbothered by life's chaos. Takes everything in stride with a smile.",
+    movieReference: "Friends",
+    style: "Easy-going & Quirky",
+    avatarBg: "from-lime-400 via-green-300 to-emerald-300",
+    samplePhrase: "Oh, I don't judge. I mean, I do, but not out loud... okay, sometimes out loud."
+  },
+  {
+    id: "Hermione",
+    name: "Hermione",
+    actor: "Emma Watson",
+    gender: "Female",
+    description: "Quick, articulate, and dazzlingly switched-on. Always three steps ahead and happy to prove it.",
+    movieReference: "Harry Potter",
+    style: "Bright & Sharp",
+    avatarBg: "from-red-700 via-yellow-600 to-red-600",
+    samplePhrase: "Honestly, if you'd just read the material, this would go a lot faster."
+  },
+  {
+    id: "Carrie",
+    name: "Carrie",
+    actor: "Sarah Jessica Parker",
+    gender: "Female",
+    description: "Silky, easy-flowing, and effortlessly conversational. Makes small talk feel like a story worth telling.",
+    movieReference: "Sex and the City",
+    style: "Smooth & Chatty",
+    avatarBg: "from-fuchsia-600 via-pink-500 to-rose-400",
+    samplePhrase: "I couldn't help but wonder... what exactly are we getting into today?"
+  },
+  {
+    id: "Olivia",
+    name: "Olivia",
+    actor: "Kerry Washington",
+    gender: "Female",
+    description: "Crisp, articulate, and always in control of the message. Every word lands exactly where it's meant to.",
+    movieReference: "Scandal",
+    style: "Clear & Precise",
+    avatarBg: "from-sky-600 via-blue-500 to-indigo-500",
+    samplePhrase: "Let's handle this. Walk me through it, precisely, from the top."
+  },
+  {
+    id: "Audrey",
+    name: "Audrey",
+    actor: "Audrey Hepburn",
+    gender: "Female",
+    description: "Delicate, gentle, and quietly elegant. Speaks like every word was chosen with care.",
+    movieReference: "Roman Holiday",
+    style: "Soft & Graceful",
+    avatarBg: "from-stone-300 via-neutral-200 to-stone-200",
+    samplePhrase: "It's such a lovely day. I don't want to rush a single moment of it."
+  },
+  {
+    id: "Regina",
+    name: "Regina",
+    actor: "Rachel McAdams",
+    gender: "Female",
+    description: "Blunt, confident, and impossible to ignore. Says exactly what she means, no hedging.",
+    movieReference: "Mean Girls",
+    style: "Bold & Direct",
+    avatarBg: "from-pink-600 via-rose-500 to-red-500",
+    samplePhrase: "Get in. We're doing this now, and we're doing it my way."
+  },
+  {
+    id: "Julie",
+    name: "Julie",
+    actor: "Julie Andrews",
+    gender: "Female",
+    description: "Tender, soothing, and endlessly patient. The kind of voice that makes everything feel like it'll be alright.",
+    movieReference: "Mary Poppins",
+    style: "Gentle & Nurturing",
+    avatarBg: "from-sky-300 via-blue-200 to-cyan-200",
+    samplePhrase: "In every job that must be done, there is an element of fun. Shall we begin?"
+  },
+  {
+    id: "Ace",
+    name: "Ace",
+    actor: "Jim Carrey",
+    gender: "Male",
+    description: "Loud, wild, and bursting with unpredictable energy. Never met a moment he couldn't turn up to eleven.",
+    movieReference: "Ace Ventura",
+    style: "Excitable & Manic",
+    avatarBg: "from-lime-500 via-yellow-400 to-orange-400",
+    samplePhrase: "Alrighty then! Let's dive in -- this is gonna be great, I can feel it!"
+  },
+  {
+    id: "Maximus",
+    name: "Maximus",
+    actor: "Russell Crowe",
+    gender: "Male",
+    description: "Grounded, disciplined, and unwavering. Speaks with the calm authority of someone used to being obeyed.",
+    movieReference: "Gladiator",
+    style: "Firm & Commanding",
+    avatarBg: "from-stone-600 via-amber-700 to-yellow-700",
+    samplePhrase: "What we do in this call echoes. Let's get it right."
+  },
+  {
+    id: "Corleone",
+    name: "Corleone",
+    actor: "Marlon Brando",
+    gender: "Male",
+    description: "Low, breathy, and deliberately unhurried. Every sentence sounds like it carries weight.",
+    movieReference: "The Godfather",
+    style: "Breathy & Hushed",
+    avatarBg: "from-zinc-800 via-stone-900 to-neutral-800",
+    samplePhrase: "I'm gonna make you an offer... you'll want to hear this one out."
+  },
+  {
+    id: "Marcus",
+    name: "Marcus",
+    actor: "Denzel Washington",
+    gender: "Male",
+    description: "Crisp, deliberate, and impossible to mishear. Every word is enunciated like it matters.",
+    movieReference: "Malcolm X",
+    style: "Clear & Commanding",
+    avatarBg: "from-blue-700 via-indigo-600 to-blue-600",
+    samplePhrase: "Let's be clear about what we're doing here, and why it matters."
+  },
+  {
+    id: "Dude",
+    name: "Dude",
+    actor: "Jeff Bridges",
+    gender: "Male",
+    description: "Chill, unhurried, and impossible to rattle. Takes whatever comes with a shrug and a smile.",
+    movieReference: "The Big Lebowski",
+    style: "Easy-going & Unbothered",
+    avatarBg: "from-amber-400 via-yellow-300 to-lime-300",
+    samplePhrase: "Yeah, well, that's just, like, your opinion, man. Let's roll with it though."
+  },
+  {
+    id: "Ted",
+    name: "Ted",
+    actor: "Jason Sudeikis",
+    gender: "Male",
+    description: "Balanced, level, and relentlessly even-keeled. Nothing knocks him off his stride.",
+    movieReference: "Ted Lasso",
+    style: "Even & Steady",
+    avatarBg: "from-orange-400 via-amber-300 to-yellow-300",
+    samplePhrase: "You know what the happiest animal on earth is? A goldfish. Let's just take it one step at a time."
+  },
+  {
+    id: "Owen",
+    name: "Owen",
+    actor: "Owen Wilson",
+    gender: "Male",
+    description: "Relaxed, conversational, zero pretense. Talks to you like you've been friends for years.",
+    movieReference: "Wedding Crashers",
+    style: "Casual & Breezy",
+    avatarBg: "from-cyan-400 via-sky-300 to-blue-300",
+    samplePhrase: "Wow. Okay, that's... yeah, no, that's great, actually. Let's do this."
+  },
+  {
+    id: "Jack",
+    name: "Jack",
+    actor: "Johnny Depp",
+    gender: "Male",
+    description: "Animated, quick, and a little unpredictable. Every line lands with a wink and a flourish.",
+    movieReference: "Pirates of the Caribbean",
+    style: "Lively & Theatrical",
+    avatarBg: "from-amber-700 via-orange-600 to-red-600",
+    samplePhrase: "Why is the rum always gone? No matter -- onward, savvy?"
+  },
+  {
+    id: "Stark",
+    name: "Stark",
+    actor: "Robert Downey Jr.",
+    gender: "Male",
+    description: "Quick-thinking, technically sharp, and effortlessly well-informed. Explains complex things like they're obvious.",
+    movieReference: "Iron Man",
+    style: "Sharp & Knowledgeable",
+    avatarBg: "from-red-600 via-orange-500 to-yellow-500",
+    samplePhrase: "Follow me here -- it's actually simpler than it sounds, I promise."
+  },
+  {
+    id: "Reacher",
+    name: "Reacher",
+    actor: "Arnold Schwarzenegger",
+    gender: "Male",
+    description: "Short, direct, and completely unshakeable. Doesn't waste words, doesn't repeat himself twice.",
+    movieReference: "The Terminator",
+    style: "Firm & Blunt",
+    avatarBg: "from-neutral-700 via-zinc-600 to-slate-600",
+    samplePhrase: "I'll be back -- with an answer. Give me a second."
+  },
+  {
+    id: "Attenborough",
+    name: "Attenborough",
+    actor: "David Attenborough",
+    gender: "Male",
+    description: "Measured, documentary-calm, and quietly fascinated by everything. Narrates even small talk like a nature special.",
+    movieReference: "Planet Earth",
+    style: "Informative & Measured",
+    avatarBg: "from-emerald-700 via-teal-600 to-cyan-600",
+    samplePhrase: "And here, we observe something truly remarkable unfolding before us."
   }
 ];
 

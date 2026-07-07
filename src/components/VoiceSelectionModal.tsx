@@ -30,7 +30,28 @@ const ACCENT_MAPPING: Record<string, string> = {
   Zephyr: "Southern American",
   Orion: "American (Earnest)",
   Ursa: "Mid-Atlantic / Elegant",
-  Capella: "American (Energetic)"
+  Capella: "American (Energetic)",
+  Furiosa: "Australian (Hardened)",
+  Rey: "British (Youthful)",
+  Elle: "American (Valley)",
+  Phoebe: "American (Quirky)",
+  Hermione: "British (Received Pronunciation)",
+  Carrie: "American (New York)",
+  Olivia: "American (Crisp)",
+  Audrey: "European (Refined)",
+  Regina: "American (Suburban)",
+  Julie: "British (Classic)",
+  Ace: "American (Manic)",
+  Maximus: "Mid-Atlantic (Commanding)",
+  Corleone: "American (Italian-American)",
+  Marcus: "American (Deep South Baritone)",
+  Dude: "American (SoCal)",
+  Ted: "American (Midwest)",
+  Owen: "American (Texas Casual)",
+  Jack: "British (Theatrical)",
+  Stark: "American (New York Sharp)",
+  Reacher: "Austrian-American",
+  Attenborough: "British (Received Pronunciation)"
 };
 
 export default function VoiceSelectionModal({

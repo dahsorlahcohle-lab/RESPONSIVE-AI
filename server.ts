@@ -632,6 +632,7 @@ async function startServer() {
         //   Ursa (elegant/poised)       -> Gacrux     (Mature, female)
         //   Anna (sunny/optimistic)     -> Zephyr     (Bright, female)
         const PERSONA_VOICE_MAP: Record<string, string> = {
+          // Original 9 featured personas
           kore: "Sulafat",
           charon: "Charon",
           puck: "Puck",
@@ -640,7 +641,30 @@ async function startServer() {
           zephyr: "Algieba",
           orion: "Achird",
           ursa: "Gacrux",
-          capella: "Zephyr"
+          capella: "Zephyr",
+          // 21 additional personas exposing the rest of Gemini's 30-voice catalog --
+          // every one of these maps to its own distinct, real Gemini voice too.
+          furiosa: "Kore",
+          rey: "Leda",
+          elle: "Aoede",
+          phoebe: "Callirrhoe",
+          hermione: "Autonoe",
+          carrie: "Despina",
+          olivia: "Erinome",
+          audrey: "Achernar",
+          regina: "Pulcherrima",
+          julie: "Vindemiatrix",
+          ace: "Fenrir",
+          maximus: "Orus",
+          corleone: "Enceladus",
+          marcus: "Iapetus",
+          dude: "Umbriel",
+          ted: "Schedar",
+          owen: "Zubenelgenubi",
+          jack: "Sadachbia",
+          stark: "Sadaltager",
+          reacher: "Alnilam",
+          attenborough: "Rasalgethi"
         };
 
         const mapVoice = (vId: string): string => {
