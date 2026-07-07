@@ -1076,56 +1076,6 @@ export default function ThreeDotMenuModal({
                   </div>
                 </div>
 
-                {/* Packet Telemetry Toggles */}
-                <div className="bg-slate-950/20 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-slate-200 block flex items-center gap-1.5">
-                      <Terminal className="w-3.5 h-3.5 text-indigo-400" />
-                      Packet Telemetry Panel
-                    </span>
-                    <span className="text-[10px] text-slate-500 leading-normal block mt-1">
-                      Render low-level WebSocket protocol packet logs below active viewport.
-                    </span>
-                  </div>
-                  <button
-                    onClick={onToggleDevConsole}
-                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
-                      showDevConsole 
-                        ? "bg-indigo-500/20 border-indigo-500/30 text-indigo-300"
-                        : "bg-white/5 border-white/10 text-slate-400"
-                    }`}
-                  >
-                    {showDevConsole ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    <span>{showDevConsole ? "Enabled" : "Disabled"}</span>
-                  </button>
-                </div>
-
-                {/* Admin Management suite */}
-                {userRole === "admin" && (
-                  <div className="bg-amber-600/10 border border-amber-500/25 rounded-2xl p-4 space-y-3 shadow-lg shadow-amber-500/5">
-                    <div className="flex items-start gap-2.5">
-                      <Shield className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="text-xs font-bold text-amber-300 block">Authorized Admin Privileges</span>
-                        <span className="text-[10px] text-amber-400/80 leading-normal block mt-0.5">
-                          You are verified as a Duplex Station Admin. Access user management, system metrics, and audit tables.
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <button
-                      onClick={() => {
-                        onClose();
-                        onOpenAdmin();
-                      }}
-                      className="w-full bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-300 font-extrabold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
-                    >
-                      <Shield className="w-4 h-4" />
-                      <span>Open Admin Control Suite</span>
-                    </button>
-                  </div>
-                )}
-
                 {/* About Panel */}
                 <div className="bg-slate-950/40 p-4 border border-white/5 rounded-2xl flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-500 shrink-0">
