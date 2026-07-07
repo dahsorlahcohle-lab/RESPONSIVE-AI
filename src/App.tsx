@@ -956,16 +956,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            {/* Status indicator pill */}
-            <div className="hidden sm:flex px-3 py-1 bg-white/5 border border-white/10 rounded-full items-center gap-2 text-xs text-slate-400">
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                connectionStatus === "connected" ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
-              }`} />
-              <span className="font-mono text-[10px] uppercase">
-                {connectionStatus === "connected" ? "STATION ONLINE" : "OFFLINE"}
-              </span>
-            </div>
-
             {/* Profile trigger */}
             <button
               onClick={() => setShowProfileModal(true)}
@@ -983,18 +973,6 @@ export default function App() {
               aria-label="System Accent"
             />
 
-            {/* Developer Console Toggle */}
-            <button
-              onClick={() => setShowDevConsole(!showDevConsole)}
-              className={`p-2 rounded-lg border text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
-                showDevConsole 
-                  ? "bg-indigo-500/20 border-indigo-500/30 text-indigo-300" 
-                  : "bg-white/5 border-white/10 text-slate-400 hover:text-white"
-              }`}
-            >
-              <Terminal className="w-4 h-4" />
-              <span className="hidden sm:inline">Telemetry</span>
-            </button>
           </div>
         </div>
       </header>
@@ -1488,7 +1466,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="py-6 border-t border-white/5 text-center text-[11px] text-slate-500 relative z-10 flex flex-col items-center justify-center gap-1.5 bg-slate-950">
-        <p>RESPONSIVE AI duplex network utilizes Gemini Live voice models over secured low-latency Node channels.</p>
+        <p>RESPONSIVE AI</p>
         <div className="flex items-center gap-2 text-slate-600/80">
           <span>v1.3.0</span>
           <span className="text-slate-800 select-none">•</span>
