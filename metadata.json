@@ -1,0 +1,6 @@
+{
+  "name": "RESPONSIVE AI",
+  "description": "A real-time audio pipeline featuring RESPONSIVE AI with low-latency WebSockets, microphone PCM capture, and sequential audio playback.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

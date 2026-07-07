@@ -1,0 +1,70 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+web_modules/
+
+# Build and distribution directories
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.turbo/
+.vercel/
+
+# Logs and databases
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.sqlite
+*.db
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+Thumbtacks.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Environment and secrets (Exclude all env secrets, preserve the example template)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+.env*
+!.env.example
+
+# Testing
+coverage/
+.nyc_output/
+test-*.ts
+dns-lookup.ts
+check-env*.ts
+
+# System and temporary files
+tmp/
+temp/
+.sass-cache/
