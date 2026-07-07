@@ -20,12 +20,7 @@ export default function AiCommandMode({
   onLogCommand
 }: AiCommandModeProps) {
   const [customCommand, setCustomCommand] = useState("");
-  const [activeCommands, setActiveCommands] = useState<string[]>([
-    "Summarize conversational core",
-    "Extract actionable client tasks",
-    "Identify emotional sentiment",
-    "De-escalate negative client speech"
-  ]);
+  const [activeCommands, setActiveCommands] = useState<string[]>([]);
   const [commandLogs, setCommandLogs] = useState<AICommandLog[]>([]);
 
   const triggerCommand = async (cmd: string) => {

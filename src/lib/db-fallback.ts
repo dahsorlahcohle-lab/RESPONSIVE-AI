@@ -155,6 +155,32 @@ export async function listContacts(userId: string): Promise<Contact[]> {
   );
 }
 
+// Resolves a requested contactId to a real, existing contact for this user --
+// auto-creating (and reusing) a single "Default Contact" if the user has none yet,
+// or falling back to their first contact if an unknown/stale ID was passed in.
+// Centralizes logic that used to be duplicated across the WS handler and REST route.
+export async function resolveContactId(userId: string, requestedContactId?: string | null): Promise<string> {
+  const contactsList = await listContacts(userId);
+
+  if (requestedContactId) {
+    const exists = contactsList.some(c => c.id === requestedContactId);
+    if (exists) return requestedContactId;
+  }
+
+  if (contactsList.length > 0) {
+    return contactsList[0].id;
+  }
+
+  const newContact = await createContact(
+    userId,
+    "Default Contact",
+    "Responsive AI",
+    "+1 555-0199",
+    "Auto-generated default contact"
+  );
+  return newContact.id;
+}
+
 // Call Sessions Operations
 export interface CallSession {
   id: string;
@@ -411,6 +437,76 @@ export async function listTranscriptMessages(callSessionId: string): Promise<Tra
     },
     "listTranscriptMessages"
   );
+}
+
+// Conversation Memory: fetch a contact's last completed call + transcript so the
+// AI persona can carry context forward on the next call back to the same contact.
+export interface ConversationMemory {
+  callSessionId: string;
+  endedAt: string;
+  transcript: TranscriptMessage[];
+}
+
+export async function getLastConversationForContact(
+  userId: string,
+  contactId: string,
+  excludeCallSessionId?: string
+): Promise<ConversationMemory | null> {
+  const lastSession = await runWithFallback<CallSession | null>(
+    async () => {
+      const supabase = getSupabaseAdmin();
+      let query = supabase
+        .from("call_sessions")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("contact_id", contactId)
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      const { data, error } = await query;
+      if (error) return { data: null, error };
+      const filtered = (data || []).filter((s: any) => s.id !== excludeCallSessionId);
+      return { data: (filtered[0] as CallSession) || null, error: null };
+    },
+    async () => {
+      const snap = await adminDb
+        .collection("call_sessions")
+        .where("user_id", "==", userId)
+        .where("contact_id", "==", contactId)
+        .where("status", "==", "completed")
+        .get();
+      const sessions: any[] = [];
+      snap.forEach(doc => sessions.push({ id: doc.id, ...doc.data() }));
+      const filtered = sessions
+        .filter(s => s.id !== excludeCallSessionId)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return (filtered[0] as CallSession) || null;
+    },
+    "getLastConversationForContact"
+  );
+
+  if (!lastSession || !lastSession.id) return null;
+
+  const transcript = await listTranscriptMessages(lastSession.id);
+  if (!transcript || transcript.length === 0) return null;
+
+  return {
+    callSessionId: lastSession.id,
+    endedAt: lastSession.ended_at || lastSession.created_at,
+    transcript
+  };
+}
+
+// Condenses a conversation memory into a compact text block safe to inject into a
+// system prompt (capped so we never blow up context with a long call history).
+export function formatConversationMemoryForPrompt(memory: ConversationMemory, maxChars = 2000): string {
+  const lines = memory.transcript.map(m => `${m.speaker}: ${m.message}`);
+  let joined = lines.join("\n");
+  if (joined.length > maxChars) {
+    // Keep the most recent context, since it's usually most relevant to "picking back up"
+    joined = "...\n" + joined.slice(joined.length - maxChars);
+  }
+  return joined;
 }
 
 // AI Commands Operations

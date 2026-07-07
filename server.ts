@@ -23,7 +23,10 @@ import {
   listAllAdminLogs,
   listAllUsers,
   updateUserStatus,
-  listAllCallSessionsForAdmin
+  listAllCallSessionsForAdmin,
+  getLastConversationForContact,
+  formatConversationMemoryForPrompt,
+  resolveContactId
 } from "./src/lib/db-fallback";
 
 dotenv.config();
@@ -187,6 +190,18 @@ async function startServer() {
     }
   });
 
+  // Get the last completed conversation transcript for a specific contact
+  // (what the AI persona now automatically recalls when calling this contact back)
+  app.get("/api/contacts/:id/last-conversation", authenticateUser, async (req: any, res: any) => {
+    try {
+      const memory = await getLastConversationForContact(req.user.uid, req.params.id);
+      res.json({ success: true, memory });
+    } catch (err: any) {
+      console.error("Error fetching last conversation for contact:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Get user preferences
   app.get("/api/preferences", authenticateUser, async (req: any, res: any) => {
     try {
@@ -224,38 +239,7 @@ async function startServer() {
   app.post("/api/calls", authenticateUser, async (req: any, res: any) => {
     const { contactId, selectedVoice } = req.body;
     try {
-      let resolvedContactId = contactId || null;
-      const contactsList = await listContacts(req.user.uid);
-      if (resolvedContactId) {
-        const exists = contactsList.some(c => c.id === resolvedContactId);
-        if (!exists) {
-          if (contactsList.length > 0) {
-            resolvedContactId = contactsList[0].id;
-          } else {
-            const newC = await createContact(
-              req.user.uid,
-              "Default Contact",
-              "Responsive AI",
-              "+1 555-0199",
-              "Auto-generated default contact"
-            );
-            resolvedContactId = newC.id;
-          }
-        }
-      } else {
-        if (contactsList.length > 0) {
-          resolvedContactId = contactsList[0].id;
-        } else {
-          const newC = await createContact(
-            req.user.uid,
-            "Default Contact",
-            "Responsive AI",
-            "+1 555-0199",
-            "Auto-generated default contact"
-          );
-          resolvedContactId = newC.id;
-        }
-      }
+      const resolvedContactId = await resolveContactId(req.user.uid, contactId);
 
       const session = await createCallSession(req.user.uid, resolvedContactId, selectedVoice || "Zephyr");
       res.json({ success: true, session, contactId: resolvedContactId });
@@ -526,40 +510,11 @@ async function startServer() {
         const voiceName = voiceId || "Zephyr";
         currentVoiceId = voiceName;
         callStartTime = Date.now();
-        
-        let resolvedContactId = contactId || null;
-        // Search for existing contact or create if none exists
-        const contactsList = await listContacts(decodedUser.uid);
-        if (resolvedContactId) {
-          const exists = contactsList.some(c => c.id === resolvedContactId);
-          if (!exists) {
-            if (contactsList.length > 0) {
-              resolvedContactId = contactsList[0].id;
-            } else {
-              const newC = await createContact(
-                decodedUser.uid,
-                "Default Contact",
-                "Responsive AI",
-                "+1 555-0199",
-                "Auto-generated default contact"
-              );
-              resolvedContactId = newC.id;
-            }
-          }
-        } else {
-          if (contactsList.length > 0) {
-            resolvedContactId = contactsList[0].id;
-          } else {
-            const newC = await createContact(
-              decodedUser.uid,
-              "Default Contact",
-              "Responsive AI",
-              "+1 555-0199",
-              "Auto-generated default contact"
-            );
-            resolvedContactId = newC.id;
-          }
-        }
+
+        // contactId is expected to already be resolved by connectGemini before the
+        // Gemini session was opened, but resolve again defensively in case
+        // startCallLogging is ever called on its own with a raw/unresolved id.
+        const resolvedContactId = await resolveContactId(decodedUser.uid, contactId);
 
         const callSession = await createCallSession(decodedUser.uid, resolvedContactId, voiceName);
         callId = callSession?.id || null;
@@ -644,7 +599,23 @@ async function startServer() {
 
         const resolvedPrompt = foundPersona ? foundPersona.prompt : (systemPrompt || "You are an engaging phone partner. Keep your replies friendly, conversational, and concise. Ask questions to keep the flow alive!");
 
-        const augmentedPrompt = `${resolvedPrompt}\n\nCRITICAL PHONE CALL GUIDELINES:\n1. You are in a direct, real-time live phone call. \n2. NEVER mention or reference your "system prompt", "instructions", "instructions provided", "context", "prompt setup", "scenario description", "guidelines", or "roleplay". \n3. NEVER say things like "Based on your prompt", "According to the instructions", "In this scenario", or "Since you instructed me to". \n4. Stay 100% in character naturally from the very first word. Respond directly and authentically as if the situation is entirely real and happening live, with no meta-commentary about being an AI following a prompt.\n5. Keep your speech warm, natural, and highly conversational, designed for oral communication.`;
+        // 3. Resolve the contact for this call up front (auto-creates/reuses a Default
+        // Contact if needed) so we can look up the last completed conversation with
+        // them and give the AI real memory of it before the call even connects.
+        const resolvedContactId = await resolveContactId(decodedUser.uid, contactId);
+
+        let memoryBlock = "";
+        try {
+          const lastConversation = await getLastConversationForContact(decodedUser.uid, resolvedContactId);
+          if (lastConversation) {
+            const memoryText = formatConversationMemoryForPrompt(lastConversation);
+            memoryBlock = `\n\nMEMORY FROM YOUR LAST CALL WITH THIS CONTACT (use this naturally to pick up where you left off or answer questions about it -- never say "according to my notes" or reference this being logged/recorded):\n${memoryText}`;
+          }
+        } catch (err) {
+          console.error("Failed to load last conversation memory for contact:", err);
+        }
+
+        const augmentedPrompt = `${resolvedPrompt}\n\nCRITICAL PHONE CALL GUIDELINES:\n1. You are in a direct, real-time live phone call. \n2. NEVER mention or reference your "system prompt", "instructions", "instructions provided", "context", "prompt setup", "scenario description", "guidelines", or "roleplay". \n3. NEVER say things like "Based on your prompt", "According to the instructions", "In this scenario", or "Since you instructed me to". \n4. Stay 100% in character naturally from the very first word. Respond directly and authentically as if the situation is entirely real and happening live, with no meta-commentary about being an AI following a prompt.\n5. Keep your speech warm, natural, and highly conversational, designed for oral communication.${memoryBlock}`;
 
         const mapVoice = (vId: string): string => {
           const lower = (vId || "").toLowerCase();
@@ -751,7 +722,7 @@ async function startServer() {
         }
 
         if (!isUpdate) {
-          await startCallLogging(resolvedVoice, contactId);
+          await startCallLogging(resolvedVoice, resolvedContactId);
         } else if (callId) {
           try {
             currentVoiceId = resolvedVoice || "Zephyr";
