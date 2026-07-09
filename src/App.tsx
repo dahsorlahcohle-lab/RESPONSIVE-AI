@@ -1313,7 +1313,7 @@ export default function App() {
                 <button
                   onClick={() => setShowCallContactSelectorModal(true)}
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-black/25 hover:bg-black/40 border border-white/5 hover:border-white/10 text-slate-400 hover:text-white transition-all cursor-pointer group"
-                  title="Select Contact Directory"
+                  title="Select Contact"
                 >
                   <User className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-all" />
                   <span className="text-[10px] font-black uppercase tracking-wider font-mono">Contact</span>

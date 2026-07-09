@@ -342,7 +342,7 @@ export default function ThreeDotMenuModal({
                 }`}
               >
                 <User className="w-4 h-4 shrink-0" />
-                <span>Contact Directory</span>
+                <span>Contact</span>
               </button>
               <button
                 onClick={() => { setActiveTab("history"); }}
@@ -408,7 +408,7 @@ export default function ThreeDotMenuModal({
           <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-950/30">
             <div>
               <h2 className="text-sm font-extrabold text-white tracking-tight flex items-center gap-2">
-                {activeTab === "contacts" && <>👥 Contact & Client Directory</>}
+                {activeTab === "contacts" && <>👥 Contact</>}
                 {activeTab === "history" && <>📜 Durable Call Log Archives</>}
                 {activeTab === "ai" && <>🧠 AI Persona Configuration Core</>}
                 {activeTab === "settings" && <>⚙️ System & Administrative Preferences</>}
