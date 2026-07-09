@@ -33,7 +33,7 @@ import UserProfileModal from "./components/UserProfileModal";
 import AdminConsole from "./components/AdminConsole";
 import CallHistoryDrawer from "./components/CallHistoryDrawer";
 import AiCommandMode from "./components/AiCommandMode";
-import LiveTranscriptView from "./components/LiveTranscriptView";
+import { useCallTranscript } from "./hooks/useCallTranscript";
 import VoiceSelectionModal from "./components/VoiceSelectionModal";
 import ThreeDotMenuModal, { AI_PERSONAS } from "./components/ThreeDotMenuModal";
 import CallContactSelectorModal from "./components/CallContactSelectorModal";
@@ -578,6 +578,19 @@ export default function App() {
       console.error("Failed to fetch call history:", err);
     }
   }, [authToken]);
+
+  // Silently records + saves the call transcript in the background, tied to
+  // whichever contact this call belongs to. No live transcript UI anymore --
+  // this just keeps the conversation history and AI memory feature working.
+  useCallTranscript({
+    isActive: callState === "active",
+    currentAiText,
+    callSessionId: activeCallSessionId,
+    authToken,
+    onSaveCompleted: () => {
+      fetchCalls();
+    }
+  });
 
   const fetchContacts = useCallback(async () => {
     if (!authToken) return;
@@ -1540,20 +1553,9 @@ export default function App() {
 
                 </div>
 
-                {/* Right Side: Duplex Live Transcripts & Intelligent Co-Pilot commands */}
+                {/* Right Side: Intelligent Co-Pilot commands (live transcript view removed --
+                    conversation is still recorded and saved silently in the background) */}
                 <div className="grid grid-cols-1 gap-6">
-                  {/* Live speech transcription */}
-                  <LiveTranscriptView
-                    isActive={callState === "active"}
-                    currentAiText={currentAiText}
-                    callSessionId={activeCallSessionId}
-                    authToken={authToken}
-                    onSaveCompleted={() => {
-                      fetchCalls();
-                    }}
-                  />
-
-                  {/* Interactive Co-pilot controls */}
                   <AiCommandMode
                     callSessionId={activeCallSessionId}
                     authToken={authToken}
