@@ -1195,6 +1195,48 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Sidebar Menu dropdown -- rendered at root level (not inside <header>) so it always
+          paints above <main> instead of being covered/clipped by it, and so taps land
+          correctly instead of hitting whatever main content sits underneath. */}
+      <AnimatePresence>
+        {showSidebarMenu && (
+          <>
+            {/* Click-outside backdrop to close */}
+            <div
+              className="fixed inset-0 z-[90]"
+              onClick={() => setShowSidebarMenu(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.97 }}
+              transition={{ duration: 0.15 }}
+              className="fixed top-[4.25rem] right-4 sm:right-6 w-52 bg-slate-900/95 border border-white/10 rounded-2xl p-2 backdrop-blur-md shadow-2xl z-[100] flex flex-col gap-1"
+            >
+              {([
+                { tab: "contacts", label: "Contact", icon: User },
+                { tab: "voice", label: "Voice", icon: Volume2 },
+                { tab: "history", label: "Call History Logs", icon: History },
+                { tab: "settings", label: "System Settings", icon: Settings },
+              ] as const).map(({ tab, label, icon: Icon }) => (
+                <button
+                  key={tab}
+                  onClick={() => {
+                    setControlCenterTab(tab);
+                    setShowThreeDotMenuModal(true);
+                    setShowSidebarMenu(false);
+                  }}
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-all cursor-pointer text-left"
+                >
+                  <Icon className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Main RESPONSIVE AI Header */}
       <header className="border-b border-white/5 bg-slate-950/60 backdrop-blur-md relative z-10">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -1219,60 +1261,21 @@ export default function App() {
               <span className="hidden md:inline">{user?.displayName || "My Profile"}</span>
             </button>
 
-            {/* Sidebar Menu toggle -- click to reveal Contact / Voice / History / Settings */}
-            <div className="relative">
-              <button
-                onClick={() => setShowSidebarMenu((v) => !v)}
-                className={`p-2 rounded-lg border transition-all text-xs flex items-center gap-1.5 cursor-pointer ${
-                  showSidebarMenu
-                    ? "border-indigo-500/40 bg-indigo-600/10 text-indigo-300"
-                    : "border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-                }`}
-                title="Menu"
-              >
-                <Menu className="w-4 h-4" />
-                <span className="hidden md:inline">Menu</span>
-              </button>
-
-              <AnimatePresence>
-                {showSidebarMenu && (
-                  <>
-                    {/* Click-outside backdrop to close */}
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setShowSidebarMenu(false)}
-                    />
-                    <motion.div
-                      initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 top-full mt-2 w-52 bg-slate-900/95 border border-white/10 rounded-2xl p-2 backdrop-blur-md shadow-2xl z-50 flex flex-col gap-1"
-                    >
-                      {([
-                        { tab: "contacts", label: "Contact", icon: User },
-                        { tab: "voice", label: "Voice", icon: Volume2 },
-                        { tab: "history", label: "Call History Logs", icon: History },
-                        { tab: "settings", label: "System Settings", icon: Settings },
-                      ] as const).map(({ tab, label, icon: Icon }) => (
-                        <button
-                          key={tab}
-                          onClick={() => {
-                            setControlCenterTab(tab);
-                            setShowThreeDotMenuModal(true);
-                            setShowSidebarMenu(false);
-                          }}
-                          className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-all cursor-pointer text-left"
-                        >
-                          <Icon className="w-4 h-4 text-indigo-400 shrink-0" />
-                          <span>{label}</span>
-                        </button>
-                      ))}
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
+            {/* Sidebar Menu toggle -- click to reveal Contact / Voice / History / Settings.
+                The dropdown itself is rendered at root level (see top-level overlays below)
+                so it always paints above <main> and is never clipped or covered. */}
+            <button
+              onClick={() => setShowSidebarMenu((v) => !v)}
+              className={`p-2 rounded-lg border transition-all text-xs flex items-center gap-1.5 cursor-pointer ${
+                showSidebarMenu
+                  ? "border-indigo-500/40 bg-indigo-600/10 text-indigo-300"
+                  : "border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
+              }`}
+              title="Menu"
+            >
+              <Menu className="w-4 h-4" />
+              <span className="hidden md:inline">Menu</span>
+            </button>
 
             {/* Discreet Aesthetic Hidden Entry Symbol */}
             <button
