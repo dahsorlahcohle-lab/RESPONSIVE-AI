@@ -32,7 +32,7 @@ import AuthScreen from "./components/AuthScreen";
 import UserProfileModal from "./components/UserProfileModal";
 import AdminConsole from "./components/AdminConsole";
 import CallHistoryDrawer from "./components/CallHistoryDrawer";
-import AiCommandMode from "./components/AiCommandMode";
+import CallTopicPanel from "./components/CallTopicPanel";
 import VoiceSelectionModal from "./components/VoiceSelectionModal";
 import ThreeDotMenuModal, { AI_PERSONAS } from "./components/ThreeDotMenuModal";
 import CallContactSelectorModal from "./components/CallContactSelectorModal";
@@ -442,6 +442,11 @@ export default function App() {
   const [systemPrompt, setSystemPrompt] = useState(
     "You are an engaging phone partner. Keep your replies friendly, conversational, and concise. Ask questions to keep the flow alive!"
   );
+  // What the user wants the AI to talk about -- editable before a call starts (folded
+  // into the AI's instructions on connect) and during a live call (pushed straight into
+  // the live Gemini session so it reacts to it immediately). Same value, two entry points.
+  const [callTopic, setCallTopic] = useState("");
+  const activeTopicRef = useRef(callTopic);
   const [selectedVoice, setSelectedVoice] = useState("Zephyr");
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -749,6 +754,7 @@ export default function App() {
           systemPrompt: activePromptRef.current,
           voiceId: selectedVoice,
           contactId: targetContactId,
+          callTopic: activeTopicRef.current,
         };
         socket.send(JSON.stringify({ type: "config", data: setupPayload }));
         addLog("out", "config", setupPayload);
@@ -978,9 +984,24 @@ export default function App() {
     }
   }, [selectedVoice, addLog]);
 
+  // Pushes the Call Topic text straight into the live Gemini session as an
+  // out-of-band operator directive (not audio, doesn't wait for the mic) --
+  // this is what actually makes typing something mid-call affect what the AI
+  // says next, unlike the old "AI Command Panel" which only logged to the DB.
+  const sendLiveDirective = useCallback((text: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      addLog("out", "live_directive", { text });
+      wsRef.current.send(JSON.stringify({
+        type: "live_directive",
+        data: { text }
+      }));
+    }
+  }, [addLog]);
+
   // Handle connection trigger
   const handlePlaceCall = (overrideContactId?: string | null) => {
     activePromptRef.current = systemPrompt;
+    activeTopicRef.current = callTopic;
     callStartTimeRef.current = Date.now();
     const targetContactId = overrideContactId !== undefined ? overrideContactId : selectedContactId;
     startCallSession(targetContactId);
@@ -1542,9 +1563,11 @@ export default function App() {
                 {/* Right Side: Intelligent Co-Pilot commands (live transcript view removed --
                     conversation is still recorded and saved silently in the background) */}
                 <div className="grid grid-cols-1 gap-6">
-                  <AiCommandMode
-                    callSessionId={activeCallSessionId}
-                    authToken={authToken}
+                  <CallTopicPanel
+                    value={callTopic}
+                    onChange={setCallTopic}
+                    isLive={true}
+                    onSendLive={sendLiveDirective}
                   />
                 </div>
 
@@ -1664,6 +1687,8 @@ export default function App() {
             }}
             showDevConsole={showDevConsole}
             onToggleDevConsole={() => setShowDevConsole(!showDevConsole)}
+            callTopic={callTopic}
+            onChangeCallTopic={setCallTopic}
           />
         )}
 

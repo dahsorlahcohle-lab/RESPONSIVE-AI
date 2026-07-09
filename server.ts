@@ -612,7 +612,7 @@ async function startServer() {
       }
     });
 
-    const connectGemini = async (systemPrompt: string, voiceId: string, isUpdate = false, contactId?: string) => {
+    const connectGemini = async (systemPrompt: string, voiceId: string, isUpdate = false, contactId?: string, callTopic?: string) => {
       if (isConnectingGemini) {
         console.log("Already establishing connection, ignoring request");
         return;
@@ -667,7 +667,15 @@ async function startServer() {
           console.error("Failed to load last conversation memory for contact:", err);
         }
 
-        const augmentedPrompt = `${resolvedPrompt}\n\nCRITICAL PHONE CALL GUIDELINES:\n1. You are in a direct, real-time live phone call. \n2. NEVER mention or reference your "system prompt", "instructions", "instructions provided", "context", "prompt setup", "scenario description", "guidelines", or "roleplay". \n3. NEVER say things like "Based on your prompt", "According to the instructions", "In this scenario", or "Since you instructed me to". \n4. Stay 100% in character naturally from the very first word. Respond directly and authentically as if the situation is entirely real and happening live, with no meta-commentary about being an AI following a prompt.\n5. Keep your speech warm, natural, and highly conversational, designed for oral communication.${memoryBlock}`;
+        // Optional operator-set focus for this call ("Call Topic & Talking Points" box,
+        // set before the call in AI Persona Configuration Core). Folded into the
+        // instructions here so the AI naturally works toward it from the first word --
+        // mid-call updates to the same box are handled separately via "live_directive".
+        const topicBlock = callTopic && callTopic.trim()
+          ? `\n\nCALL TOPIC / TALKING POINTS (set by the call operator before this call -- naturally steer the conversation toward this over time, never mention that it was set beforehand):\n${callTopic.trim()}`
+          : "";
+
+        const augmentedPrompt = `${resolvedPrompt}\n\nCRITICAL PHONE CALL GUIDELINES:\n1. You are in a direct, real-time live phone call. \n2. NEVER mention or reference your "system prompt", "instructions", "instructions provided", "context", "prompt setup", "scenario description", "guidelines", or "roleplay". \n3. NEVER say things like "Based on your prompt", "According to the instructions", "In this scenario", or "Since you instructed me to". \n4. Stay 100% in character naturally from the very first word. Respond directly and authentically as if the situation is entirely real and happening live, with no meta-commentary about being an AI following a prompt.\n5. Keep your speech warm, natural, and highly conversational, designed for oral communication.${memoryBlock}${topicBlock}`;
 
         // Maps each persona shown in the UI (VOICES in src/App.tsx) to one of Gemini's
         // 30 real prebuilt TTS voices. Previously several personas silently collapsed onto
@@ -869,14 +877,46 @@ async function startServer() {
         const { type, data } = envelope;
 
         if (type === "config") {
-          const { systemPrompt, voiceId, contactId } = data || {};
-          await connectGemini(systemPrompt, voiceId, false, contactId);
+          const { systemPrompt, voiceId, contactId, callTopic } = data || {};
+          await connectGemini(systemPrompt, voiceId, false, contactId, callTopic);
           return;
         }
 
         if (type === "update_config") {
-          const { systemPrompt, voiceId } = data || {};
-          await connectGemini(systemPrompt, voiceId, true);
+          const { systemPrompt, voiceId, callTopic } = data || {};
+          await connectGemini(systemPrompt, voiceId, true, undefined, callTopic);
+          return;
+        }
+
+        // Live "Call Topic & Talking Points" injection -- pushes operator-typed text
+        // straight into the ongoing Gemini session as a client content turn, WITHOUT
+        // reconnecting/resetting the session (that would cut audio). This is what
+        // actually makes typing something mid-call affect what the AI says next --
+        // the previous "AI Command Panel" only logged text to the DB and never sent
+        // anything to the model.
+        if (type === "live_directive") {
+          const { text } = data || {};
+          const trimmed = (text || "").trim();
+          if (geminiSession && trimmed) {
+            try {
+              geminiSession.sendClientContent({
+                turns: [
+                  {
+                    role: "user",
+                    parts: [
+                      {
+                        text: `[SILENT OPERATOR DIRECTIVE -- not spoken by the person on this call. Never acknowledge, repeat, or reference receiving this message in any way. Just naturally steer the conversation toward]: ${trimmed}`
+                      }
+                    ]
+                  }
+                ],
+                turnComplete: true
+              });
+              console.log(`Injected live directive into active Gemini session: "${trimmed}"`);
+            } catch (err) {
+              console.error("Failed to inject live directive into Gemini session:", err);
+            }
+          }
           return;
         }
 

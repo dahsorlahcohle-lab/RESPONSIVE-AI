@@ -6,6 +6,7 @@ import {
   Sliders, Shield, Bell, Eye, EyeOff, Terminal, Activity, HelpCircle
 } from "lucide-react";
 import { VoiceOption, VOICES } from "../App";
+import CallTopicPanel from "./CallTopicPanel";
 
 interface Contact {
   id: string;
@@ -98,6 +99,8 @@ interface ThreeDotMenuModalProps {
   onOpenAdmin: () => void;
   showDevConsole: boolean;
   onToggleDevConsole: () => void;
+  callTopic: string;
+  onChangeCallTopic: (value: string) => void;
 }
 
 export default function ThreeDotMenuModal({
@@ -118,7 +121,9 @@ export default function ThreeDotMenuModal({
   onSelectPersona,
   onOpenAdmin,
   showDevConsole,
-  onToggleDevConsole
+  onToggleDevConsole,
+  callTopic,
+  onChangeCallTopic
 }: ThreeDotMenuModalProps) {
   const [activeTab, setActiveTab] = useState<"contacts" | "history" | "ai" | "settings">("contacts");
   
@@ -981,12 +986,26 @@ export default function ThreeDotMenuModal({
                   </div>
                 </div>
 
-                {/* 2. Voice Swapper Options */}
+                {/* 2. Call Topic / Talking Points -- same box also shows up live during a call */}
+                <div className="space-y-3 pt-5 border-t border-white/5">
+                  <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <MessageSquare className="w-4 h-4 text-indigo-400" />
+                    2. Call Topic &amp; Talking Points
+                  </h3>
+                  <CallTopicPanel
+                    value={callTopic}
+                    onChange={onChangeCallTopic}
+                    isLive={false}
+                    onSendLive={() => {}}
+                  />
+                </div>
+
+                {/* 3. Voice Swapper Options */}
                 <div className="space-y-3 pt-5 border-t border-white/5">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
                       <Volume2 className="w-4 h-4 text-indigo-400" />
-                      2. Active Voice Actor
+                      3. Active Voice Actor
                     </h3>
                     <span className="text-[9px] font-mono text-slate-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/25">
                       Current: {VOICES.find(v => v.id === selectedVoice)?.name || selectedVoice}
@@ -1031,12 +1050,12 @@ export default function ThreeDotMenuModal({
                   </div>
                 </div>
 
-                {/* 3. Speed Preferences */}
+                {/* 4. Speed Preferences */}
                 <div className="space-y-3 pt-5 border-t border-white/5 bg-black/10 -mx-5 -mb-5 p-5 rounded-b-2xl">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                       <Sliders className="w-4 h-4 text-slate-400" />
-                      3. Speech Rate Pacing
+                      4. Speech Rate Pacing
                     </h3>
                     <span className="text-xs font-extrabold text-indigo-400 font-mono">{aiSpeed.toFixed(1)}x Speed</span>
                   </div>
