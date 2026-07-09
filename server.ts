@@ -16,6 +16,7 @@ import {
   listCallSessions, 
   saveTranscriptMessages, 
   listTranscriptMessages, 
+  type TranscriptMessage, 
   addAICommand, 
   getPreferences, 
   updatePreferences,
@@ -505,6 +506,40 @@ async function startServer() {
     let callStartTime = Date.now();
     let currentVoiceId = "Zephyr";
 
+    // Live transcript accumulation -- built directly from Gemini's own
+    // input/output audio transcription (see inputAudioTranscription /
+    // outputAudioTranscription in the session config below), NOT from any
+    // client-side speech recognition. This is tied to the real audio Gemini
+    // is already processing, so it's accurate and doesn't fight the browser
+    // for microphone access. Saved to the DB server-side when the call ends.
+    let sessionTranscriptMessages: TranscriptMessage[] = [];
+    let pendingUserText = "";
+    let pendingAiText = "";
+
+    const flushPendingUserText = () => {
+      if (pendingUserText.trim()) {
+        sessionTranscriptMessages.push({
+          call_session_id: callId || "",
+          speaker: "User",
+          message: pendingUserText.trim(),
+          timestamp: new Date().toISOString()
+        });
+        pendingUserText = "";
+      }
+    };
+
+    const flushPendingAiText = () => {
+      if (pendingAiText.trim()) {
+        sessionTranscriptMessages.push({
+          call_session_id: callId || "",
+          speaker: "AI",
+          message: pendingAiText.trim(),
+          timestamp: new Date().toISOString()
+        });
+        pendingAiText = "";
+      }
+    };
+
     const startCallLogging = async (voiceId: string, contactId?: string) => {
       try {
         const voiceName = voiceId || "Zephyr";
@@ -541,6 +576,23 @@ async function startServer() {
         } catch (err) {
           console.error("Failed to update call log:", err);
         }
+
+        // Flush any last in-progress utterance (the call may have ended mid-turn,
+        // before a turnComplete ever fired) and save the full real transcript.
+        flushPendingUserText();
+        flushPendingAiText();
+        if (sessionTranscriptMessages.length > 0) {
+          try {
+            await saveTranscriptMessages(callId, sessionTranscriptMessages);
+            console.log(`Saved ${sessionTranscriptMessages.length} real transcript messages for call: ${callId}`);
+          } catch (err) {
+            console.error("Failed to save call transcript:", err);
+          }
+        }
+        sessionTranscriptMessages = [];
+        pendingUserText = "";
+        pendingAiText = "";
+
         callId = null;
       }
     };
@@ -687,6 +739,13 @@ async function startServer() {
                 }
               }
             },
+            // Ask Gemini to transcribe BOTH sides of the call as real text, straight
+            // from the actual audio it's already processing. The model only ever
+            // speaks in audio (responseModalities is AUDIO-only, for low latency),
+            // so without this, there was never any text of what either side said --
+            // that's why saved call transcripts were showing up empty.
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
             systemInstruction: augmentedPrompt
           },
           callbacks: {
@@ -718,8 +777,26 @@ async function startServer() {
                   }
                 }
 
+                // Real transcript capture: Gemini transcribes each side of the call
+                // itself, straight from the audio. A new chunk from one side means
+                // the other side just finished its turn, so flush it as a completed
+                // message before appending the new chunk.
+                const inputTranscriptChunk = msg.serverContent?.inputTranscription?.text;
+                if (inputTranscriptChunk) {
+                  flushPendingAiText();
+                  pendingUserText += inputTranscriptChunk;
+                }
+
+                const outputTranscriptChunk = msg.serverContent?.outputTranscription?.text;
+                if (outputTranscriptChunk) {
+                  flushPendingUserText();
+                  pendingAiText += outputTranscriptChunk;
+                }
+
                 const turnComplete = msg.serverContent?.turnComplete;
                 if (turnComplete) {
+                  flushPendingUserText();
+                  flushPendingAiText();
                   sendStatus("listening");
                 }
 

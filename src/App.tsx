@@ -33,7 +33,6 @@ import UserProfileModal from "./components/UserProfileModal";
 import AdminConsole from "./components/AdminConsole";
 import CallHistoryDrawer from "./components/CallHistoryDrawer";
 import AiCommandMode from "./components/AiCommandMode";
-import { useCallTranscript } from "./hooks/useCallTranscript";
 import VoiceSelectionModal from "./components/VoiceSelectionModal";
 import ThreeDotMenuModal, { AI_PERSONAS } from "./components/ThreeDotMenuModal";
 import CallContactSelectorModal from "./components/CallContactSelectorModal";
@@ -578,19 +577,6 @@ export default function App() {
       console.error("Failed to fetch call history:", err);
     }
   }, [authToken]);
-
-  // Silently records + saves the call transcript in the background, tied to
-  // whichever contact this call belongs to. No live transcript UI anymore --
-  // this just keeps the conversation history and AI memory feature working.
-  useCallTranscript({
-    isActive: callState === "active",
-    currentAiText,
-    callSessionId: activeCallSessionId,
-    authToken,
-    onSaveCompleted: () => {
-      fetchCalls();
-    }
-  });
 
   const fetchContacts = useCallback(async () => {
     if (!authToken) return;
