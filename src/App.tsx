@@ -24,7 +24,8 @@ import {
   ShieldCheck,
   LayoutDashboard,
   RefreshCw,
-  History
+  History,
+  Menu
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { getSupabase } from "./lib/supabase";
@@ -455,6 +456,7 @@ export default function App() {
   // Unified Three-Dot Control Hub States
   const [showThreeDotMenuModal, setShowThreeDotMenuModal] = useState(false);
   const [controlCenterTab, setControlCenterTab] = useState<"contacts" | "voice" | "history" | "settings">("contacts");
+  const [showSidebarMenu, setShowSidebarMenu] = useState(false);
   const [showCallContactSelectorModal, setShowCallContactSelectorModal] = useState(false);
   const [selectedPersona, setSelectedPersona] = useState("friendly");
 
@@ -1217,6 +1219,61 @@ export default function App() {
               <span className="hidden md:inline">{user?.displayName || "My Profile"}</span>
             </button>
 
+            {/* Sidebar Menu toggle -- click to reveal Contact / Voice / History / Settings */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSidebarMenu((v) => !v)}
+                className={`p-2 rounded-lg border transition-all text-xs flex items-center gap-1.5 cursor-pointer ${
+                  showSidebarMenu
+                    ? "border-indigo-500/40 bg-indigo-600/10 text-indigo-300"
+                    : "border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
+                }`}
+                title="Menu"
+              >
+                <Menu className="w-4 h-4" />
+                <span className="hidden md:inline">Menu</span>
+              </button>
+
+              <AnimatePresence>
+                {showSidebarMenu && (
+                  <>
+                    {/* Click-outside backdrop to close */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowSidebarMenu(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-full mt-2 w-52 bg-slate-900/95 border border-white/10 rounded-2xl p-2 backdrop-blur-md shadow-2xl z-50 flex flex-col gap-1"
+                    >
+                      {([
+                        { tab: "contacts", label: "Contact", icon: User },
+                        { tab: "voice", label: "Voice", icon: Volume2 },
+                        { tab: "history", label: "Call History Logs", icon: History },
+                        { tab: "settings", label: "System Settings", icon: Settings },
+                      ] as const).map(({ tab, label, icon: Icon }) => (
+                        <button
+                          key={tab}
+                          onClick={() => {
+                            setControlCenterTab(tab);
+                            setShowThreeDotMenuModal(true);
+                            setShowSidebarMenu(false);
+                          }}
+                          className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-all cursor-pointer text-left"
+                        >
+                          <Icon className="w-4 h-4 text-indigo-400 shrink-0" />
+                          <span>{label}</span>
+                        </button>
+                      ))}
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* Discreet Aesthetic Hidden Entry Symbol */}
             <button
               onClick={() => navigateTo("admin")}
@@ -1229,32 +1286,8 @@ export default function App() {
       </header>
 
       {/* Core Interface Workspace */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col md:flex-row gap-5 items-start justify-center">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col justify-center">
 
-        {/* Persistent Side Bar -- always-visible nav, no more digging through a hidden Menu button */}
-        <nav className="flex md:flex-col gap-2 w-full md:w-40 shrink-0 order-2 md:order-1 bg-slate-900/40 border border-white/5 rounded-3xl p-2.5 backdrop-blur-md shadow-xl">
-          {([
-            { tab: "contacts", label: "Contact", icon: User },
-            { tab: "voice", label: "Voice", icon: Volume2 },
-            { tab: "history", label: "Call History Logs", icon: History },
-            { tab: "settings", label: "System Settings", icon: Settings },
-          ] as const).map(({ tab, label, icon: Icon }) => (
-            <button
-              key={tab}
-              onClick={() => {
-                setControlCenterTab(tab);
-                setShowThreeDotMenuModal(true);
-              }}
-              className="flex-1 md:flex-none flex flex-row md:flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-black/25 hover:bg-black/40 border border-white/5 hover:border-white/10 text-slate-400 hover:text-white transition-all cursor-pointer group"
-              title={label}
-            >
-              <Icon className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-all" />
-              <span className="text-[9px] font-black uppercase tracking-wider font-mono text-center leading-tight">{label}</span>
-            </button>
-          ))}
-        </nav>
-
-        <div className="flex-1 min-w-0 w-full order-1 md:order-2 flex flex-col justify-center">
         <AnimatePresence mode="wait">
           
           {/* STAGE 1: Minimalist Apple-Style Pre-Call Dialer Stage */}
@@ -1687,8 +1720,6 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        </div>
 
       </main>
 
