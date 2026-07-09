@@ -454,6 +454,7 @@ export default function App() {
 
   // Unified Three-Dot Control Hub States
   const [showThreeDotMenuModal, setShowThreeDotMenuModal] = useState(false);
+  const [controlCenterTab, setControlCenterTab] = useState<"contacts" | "voice" | "history" | "settings">("contacts");
   const [showCallContactSelectorModal, setShowCallContactSelectorModal] = useState(false);
   const [selectedPersona, setSelectedPersona] = useState("friendly");
 
@@ -1228,8 +1229,32 @@ export default function App() {
       </header>
 
       {/* Core Interface Workspace */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col justify-center">
-        
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col md:flex-row gap-5 items-start justify-center">
+
+        {/* Persistent Side Bar -- always-visible nav, no more digging through a hidden Menu button */}
+        <nav className="flex md:flex-col gap-2 w-full md:w-40 shrink-0 order-2 md:order-1 bg-slate-900/40 border border-white/5 rounded-3xl p-2.5 backdrop-blur-md shadow-xl">
+          {([
+            { tab: "contacts", label: "Contact", icon: User },
+            { tab: "voice", label: "Voice", icon: Volume2 },
+            { tab: "history", label: "Call History Logs", icon: History },
+            { tab: "settings", label: "System Settings", icon: Settings },
+          ] as const).map(({ tab, label, icon: Icon }) => (
+            <button
+              key={tab}
+              onClick={() => {
+                setControlCenterTab(tab);
+                setShowThreeDotMenuModal(true);
+              }}
+              className="flex-1 md:flex-none flex flex-row md:flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-black/25 hover:bg-black/40 border border-white/5 hover:border-white/10 text-slate-400 hover:text-white transition-all cursor-pointer group"
+              title={label}
+            >
+              <Icon className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-all" />
+              <span className="text-[9px] font-black uppercase tracking-wider font-mono text-center leading-tight">{label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex-1 min-w-0 w-full order-1 md:order-2 flex flex-col justify-center">
         <AnimatePresence mode="wait">
           
           {/* STAGE 1: Minimalist Apple-Style Pre-Call Dialer Stage */}
@@ -1324,39 +1349,6 @@ export default function App() {
                   onSendLive={() => {}}
                   compact
                 />
-              </div>
-
-              {/* Action controller deck */}
-              <div className="grid grid-cols-3 gap-3.5 w-full bg-slate-900/40 border border-white/5 rounded-3xl p-4.5 backdrop-blur-md shadow-xl">
-                {/* Voice Modal button */}
-                <button
-                  onClick={() => setShowVoiceModal(true)}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-black/25 hover:bg-black/40 border border-white/5 hover:border-white/10 text-slate-400 hover:text-white transition-all cursor-pointer group"
-                  title="Choose active voice actor"
-                >
-                  <Volume2 className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-all" />
-                  <span className="text-[10px] font-black uppercase tracking-wider font-mono">Voice</span>
-                </button>
-
-                {/* Control Center button */}
-                <button
-                  onClick={() => setShowThreeDotMenuModal(true)}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-black/25 hover:bg-black/40 border border-white/5 hover:border-white/10 text-slate-400 hover:text-white transition-all cursor-pointer group"
-                  title="Open Control Center"
-                >
-                  <Settings className="w-5 h-5 text-indigo-400 group-hover:rotate-45 transition-transform duration-300" />
-                  <span className="text-[10px] font-black uppercase tracking-wider font-mono">Menu</span>
-                </button>
-
-                {/* Change Contact button */}
-                <button
-                  onClick={() => setShowCallContactSelectorModal(true)}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-black/25 hover:bg-black/40 border border-white/5 hover:border-white/10 text-slate-400 hover:text-white transition-all cursor-pointer group"
-                  title="Select Contact"
-                >
-                  <User className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-all" />
-                  <span className="text-[10px] font-black uppercase tracking-wider font-mono">Contact</span>
-                </button>
               </div>
 
               {/* Glowing Green Phone Dial Button */}
@@ -1696,6 +1688,8 @@ export default function App() {
           )}
         </AnimatePresence>
 
+        </div>
+
       </main>
 
       {/* Modern overlays */}
@@ -1703,6 +1697,7 @@ export default function App() {
         {showThreeDotMenuModal && (
           <ThreeDotMenuModal
             isOpen={showThreeDotMenuModal}
+            initialTab={controlCenterTab}
             onClose={() => setShowThreeDotMenuModal(false)}
             contacts={contacts}
             selectedContactId={selectedContactId}

@@ -82,6 +82,8 @@ export const AI_PERSONAS: AIPersona[] = [
 interface ThreeDotMenuModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Which tab to land on when the Control Center opens (driven by the persistent sidebar). */
+  initialTab?: "contacts" | "voice" | "history" | "settings";
   contacts: Contact[];
   selectedContactId: string | null;
   onSelectContact: (id: string | null) => void;
@@ -101,6 +103,7 @@ interface ThreeDotMenuModalProps {
 export default function ThreeDotMenuModal({
   isOpen,
   onClose,
+  initialTab,
   contacts,
   selectedContactId,
   onSelectContact,
@@ -117,6 +120,13 @@ export default function ThreeDotMenuModal({
   onToggleDevConsole,
 }: ThreeDotMenuModalProps) {
   const [activeTab, setActiveTab] = useState<"contacts" | "voice" | "history" | "settings">("contacts");
+
+  // Jump straight to the requested tab whenever the Control Center is opened from the sidebar
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   
   // Contacts Tab State
   const [contactSearch, setContactSearch] = useState("");
