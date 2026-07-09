@@ -53,7 +53,6 @@ export function useAudioPlayback() {
         // Set up the Buffer Source node
         const source = audioCtx.createBufferSource();
         source.buffer = audioBuffer;
-        source.connect(audioCtx.destination);
 
         const currentTime = audioCtx.currentTime;
         let playTime = nextPlayTimeRef.current;
@@ -61,6 +60,25 @@ export function useAudioPlayback() {
         // If our scheduled timestamp is in the past, align it with a safe lookahead buffer
         if (playTime < currentTime) {
           playTime = currentTime + 0.05; // 50ms buffer to prevent start popping
+        }
+
+        // Only the very first chunk of a fresh turn (nothing else currently
+        // playing) gets a quick fade-in. This is what was producing the
+        // audible "blip"/click every time the AI started speaking -- jumping
+        // straight to full volume at an arbitrary waveform point creates a
+        // sharp digital click that reads as a notification-style sound.
+        // Mid-turn chunks are left untouched (direct connect, no ramp) so
+        // continuous speech stays completely seamless.
+        const isTurnStart = activeSourcesRef.current.length === 0;
+        if (isTurnStart) {
+          const fadeGain = audioCtx.createGain();
+          const fadeDuration = 0.012; // 12ms -- inaudible as a "fade", just removes the click
+          fadeGain.gain.setValueAtTime(0, playTime);
+          fadeGain.gain.linearRampToValueAtTime(1, playTime + fadeDuration);
+          source.connect(fadeGain);
+          fadeGain.connect(audioCtx.destination);
+        } else {
+          source.connect(audioCtx.destination);
         }
 
         source.start(playTime);
