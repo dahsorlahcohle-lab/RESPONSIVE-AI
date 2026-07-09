@@ -6,7 +6,6 @@ import {
   Sliders, Shield, Bell, Eye, EyeOff, Terminal, Activity, HelpCircle
 } from "lucide-react";
 import { VoiceOption, VOICES } from "../App";
-import CallTopicPanel from "./CallTopicPanel";
 
 interface Contact {
   id: string;
@@ -94,13 +93,9 @@ interface ThreeDotMenuModalProps {
   userRole: string;
   selectedVoice: string;
   onSelectVoice: (voiceId: string) => void;
-  selectedPersona: string;
-  onSelectPersona: (personaId: string) => void;
   onOpenAdmin: () => void;
   showDevConsole: boolean;
   onToggleDevConsole: () => void;
-  callTopic: string;
-  onChangeCallTopic: (value: string) => void;
 }
 
 export default function ThreeDotMenuModal({
@@ -117,15 +112,11 @@ export default function ThreeDotMenuModal({
   userRole,
   selectedVoice,
   onSelectVoice,
-  selectedPersona,
-  onSelectPersona,
   onOpenAdmin,
   showDevConsole,
   onToggleDevConsole,
-  callTopic,
-  onChangeCallTopic
 }: ThreeDotMenuModalProps) {
-  const [activeTab, setActiveTab] = useState<"contacts" | "history" | "ai" | "settings">("contacts");
+  const [activeTab, setActiveTab] = useState<"contacts" | "voice" | "history" | "settings">("contacts");
   
   // Contacts Tab State
   const [contactSearch, setContactSearch] = useState("");
@@ -356,15 +347,15 @@ export default function ThreeDotMenuModal({
                 <span>Call History logs</span>
               </button>
               <button
-                onClick={() => { setActiveTab("ai"); setSelectedCall(null); }}
+                onClick={() => { setActiveTab("voice"); setSelectedCall(null); }}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 md:w-full text-left ${
-                  activeTab === "ai" 
+                  activeTab === "voice" 
                     ? "bg-indigo-600/10 text-indigo-300 border border-indigo-500/20" 
                     : "text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent"
                 }`}
               >
-                <Cpu className="w-4 h-4 shrink-0" />
-                <span>AI Persona Core</span>
+                <Volume2 className="w-4 h-4 shrink-0" />
+                <span>Voice</span>
               </button>
               <button
                 onClick={() => { setActiveTab("settings"); setSelectedCall(null); }}
@@ -410,13 +401,13 @@ export default function ThreeDotMenuModal({
               <h2 className="text-sm font-extrabold text-white tracking-tight flex items-center gap-2">
                 {activeTab === "contacts" && <>👥 Contact</>}
                 {activeTab === "history" && <>📜 Durable Call Log Archives</>}
-                {activeTab === "ai" && <>🧠 AI Persona Configuration Core</>}
+                {activeTab === "voice" && <>🎙️ Voice &amp; Pacing</>}
                 {activeTab === "settings" && <>⚙️ System & Administrative Preferences</>}
               </h2>
               <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mt-0.5">
                 {activeTab === "contacts" && "Manage client profiles and quickly route calls"}
                 {activeTab === "history" && "Audit deep conversation transcripts and summaries"}
-                {activeTab === "ai" && "Tune response prompts, speed limits and actor voice"}
+                {activeTab === "voice" && "Choose your voice actor and speaking pace"}
                 {activeTab === "settings" && "Tweak telemetry, performance and account properties"}
               </p>
             </div>
@@ -933,79 +924,15 @@ export default function ThreeDotMenuModal({
             {/* ============================================================================ */}
             {/* AI CONFIGURATION TAB */}
             {/* ============================================================================ */}
-            {activeTab === "ai" && (
+            {activeTab === "voice" && (
               <div className="space-y-6">
-                
-                {/* 1. Persona Selector Grid */}
+
+                {/* 1. Voice Swapper Options */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-indigo-400" />
-                      1. Active System Persona ({AI_PERSONAS.length})
-                    </h3>
-                    <span className="text-[9px] font-mono text-slate-500 uppercase">Saves Context Automatically</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {AI_PERSONAS.map((persona) => {
-                      const isSelected = selectedPersona === persona.id;
-                      return (
-                        <button
-                          key={persona.id}
-                          onClick={() => onSelectPersona(persona.id)}
-                          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-2 cursor-pointer group hover:bg-white/[0.02] ${
-                            isSelected
-                              ? "bg-indigo-600/10 border-indigo-500/40 text-indigo-100"
-                              : "bg-black/20 border-white/5 text-slate-400 hover:border-white/10"
-                          }`}
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-extrabold text-xs text-white group-hover:text-indigo-300 transition-all flex items-center gap-1.5">
-                                <span className={`w-2 h-2 rounded-full bg-gradient-to-tr ${persona.color}`} />
-                                {persona.name}
-                              </span>
-                              {isSelected && (
-                                <span className="bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded text-[8px] font-bold font-mono tracking-widest uppercase">
-                                  ACTIVE
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[10.5px] text-slate-400 leading-normal line-clamp-2">
-                              {persona.description}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-1 text-[9px] font-mono text-slate-500">
-                            <span>Style: <span className="text-slate-300">{persona.style}</span></span>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-indigo-400" />}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 2. Call Topic / Talking Points -- same box also shows up live during a call */}
-                <div className="space-y-3 pt-5 border-t border-white/5">
-                  <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <MessageSquare className="w-4 h-4 text-indigo-400" />
-                    2. Call Topic &amp; Talking Points
-                  </h3>
-                  <CallTopicPanel
-                    value={callTopic}
-                    onChange={onChangeCallTopic}
-                    isLive={false}
-                    onSendLive={() => {}}
-                  />
-                </div>
-
-                {/* 3. Voice Swapper Options */}
-                <div className="space-y-3 pt-5 border-t border-white/5">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
                       <Volume2 className="w-4 h-4 text-indigo-400" />
-                      3. Active Voice Actor
+                      1. Active Voice Actor
                     </h3>
                     <span className="text-[9px] font-mono text-slate-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/25">
                       Current: {VOICES.find(v => v.id === selectedVoice)?.name || selectedVoice}
@@ -1050,12 +977,12 @@ export default function ThreeDotMenuModal({
                   </div>
                 </div>
 
-                {/* 4. Speed Preferences */}
+                {/* 2. Speed Preferences */}
                 <div className="space-y-3 pt-5 border-t border-white/5 bg-black/10 -mx-5 -mb-5 p-5 rounded-b-2xl">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                       <Sliders className="w-4 h-4 text-slate-400" />
-                      4. Speech Rate Pacing
+                      2. Speech Rate Pacing
                     </h3>
                     <span className="text-xs font-extrabold text-indigo-400 font-mono">{aiSpeed.toFixed(1)}x Speed</span>
                   </div>

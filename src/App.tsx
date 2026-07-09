@@ -1287,6 +1287,45 @@ export default function App() {
                 </div>
               </div>
 
+              {/* AI Persona Core -- persona picker + call topic, front and center on the
+                  main screen now (previously buried inside the 3-dot Control Center) */}
+              <div className="w-full bg-slate-900/40 border border-white/5 rounded-3xl p-4.5 backdrop-blur-md shadow-xl space-y-3">
+                <span className="text-[9px] font-mono font-bold text-slate-500 block uppercase tracking-widest flex items-center gap-1.5">
+                  <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                  AI Persona Core
+                </span>
+
+                <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-thin">
+                  {AI_PERSONAS.map((p) => {
+                    const isCurrent = selectedPersona === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          if (!isCurrent) handleSavePersonaPreference(p.id);
+                        }}
+                        className={`flex-shrink-0 px-3 py-2 rounded-xl border text-left transition-all text-[11px] font-bold flex items-center gap-2 cursor-pointer ${
+                          isCurrent
+                            ? "bg-indigo-600/10 border-indigo-500/40 text-indigo-200"
+                            : "bg-black/20 border-white/5 text-slate-400 hover:border-white/10"
+                        }`}
+                      >
+                        <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-tr ${p.color} shrink-0`} />
+                        <span>{p.name.split(" ").pop()}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <CallTopicPanel
+                  value={callTopic}
+                  onChange={setCallTopic}
+                  isLive={false}
+                  onSendLive={() => {}}
+                  compact
+                />
+              </div>
+
               {/* Action controller deck */}
               <div className="grid grid-cols-3 gap-3.5 w-full bg-slate-900/40 border border-white/5 rounded-3xl p-4.5 backdrop-blur-md shadow-xl">
                 {/* Voice Modal button */}
@@ -1678,17 +1717,11 @@ export default function App() {
             onSelectVoice={(voiceId) => {
               handleSaveVoicePreference(voiceId);
             }}
-            selectedPersona={selectedPersona}
-            onSelectPersona={(personaId) => {
-              handleSavePersonaPreference(personaId);
-            }}
             onOpenAdmin={() => {
               navigateTo("admin");
             }}
             showDevConsole={showDevConsole}
             onToggleDevConsole={() => setShowDevConsole(!showDevConsole)}
-            callTopic={callTopic}
-            onChangeCallTopic={setCallTopic}
           />
         )}
 
