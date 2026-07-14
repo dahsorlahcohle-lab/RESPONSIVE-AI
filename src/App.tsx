@@ -1,3 +1,4 @@
+import { LOGO_DATA_URI } from "./lib/logo";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useMicrophone } from "./hooks/useMicrophone";
 import { useAudioPlayback } from "./hooks/useAudioPlayback";
@@ -1252,7 +1253,7 @@ export default function App() {
           {/* Left: shield logo */}
           <div className="flex items-center gap-2.5">
             <img
-              src="/logo.png"
+              src={LOGO_DATA_URI}
               alt="RESPONXIVE"
               className="h-9 w-auto object-contain"
               style={{ maxHeight: "36px" }}
