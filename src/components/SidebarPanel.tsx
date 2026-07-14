@@ -13,7 +13,8 @@ import {
   Trash2,
   Edit3,
   Check,
-  PhoneCall
+  PhoneCall,
+  User
 } from "lucide-react";
 import type { VoiceOption } from "../App";
 
@@ -46,6 +47,7 @@ interface SidebarPanelProps {
   onPersonalitiesChange: (list: Personality[]) => void;
   onStartCall: (personality: Personality) => void;
   onOpenSettings: () => void;
+  onOpenProfile: () => void;
 }
 
 type Tab = "voice" | "personality" | "recent";
@@ -137,7 +139,8 @@ export default function SidebarPanel({
   authToken,
   onPersonalitiesChange,
   onStartCall,
-  onOpenSettings
+  onOpenSettings,
+  onOpenProfile,
 }: SidebarPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("personality");
   const [showForm, setShowForm] = useState(false);
@@ -389,8 +392,16 @@ export default function SidebarPanel({
               )}
             </div>
 
-            {/* Footer – Settings */}
-            <div className="shrink-0 px-3 py-3 border-t border-white/5">
+            {/* Footer – Profile + Settings */}
+            <div className="shrink-0 px-3 py-3 border-t border-white/5 flex flex-col gap-1">
+              <button
+                onClick={onOpenProfile}
+                className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 text-xs font-bold transition-all"
+              >
+                <User className="w-4 h-4" />
+                My Profile
+                <ChevronRight className="w-3.5 h-3.5 ml-auto" />
+              </button>
               <button
                 onClick={() => { onOpenSettings(); onClose(); }}
                 className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 text-xs font-bold transition-all"
