@@ -119,7 +119,7 @@ export default function ThreeDotMenuModal({
   showDevConsole,
   onToggleDevConsole,
 }: ThreeDotMenuModalProps) {
-  const [activeTab, setActiveTab] = useState<"contacts" | "voice" | "history" | "settings">("contacts");
+  const [activeTab, setActiveTab] = useState<"contacts" | "voice" | "history" | "settings">("settings");
 
   // Jump straight to the requested tab whenever the Control Center is opened from the sidebar
   useEffect(() => {
@@ -334,39 +334,9 @@ export default function ThreeDotMenuModal({
             </div>
 
             <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
-              <button
-                onClick={() => { setActiveTab("contacts"); setSelectedCall(null); }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 md:w-full text-left ${
-                  activeTab === "contacts" 
-                    ? "bg-indigo-600/10 text-indigo-300 border border-indigo-500/20" 
-                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent"
-                }`}
-              >
-                <User className="w-4 h-4 shrink-0" />
-                <span>Contact</span>
-              </button>
-              <button
-                onClick={() => { setActiveTab("history"); }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 md:w-full text-left ${
-                  activeTab === "history" 
-                    ? "bg-indigo-600/10 text-indigo-300 border border-indigo-500/20" 
-                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent"
-                }`}
-              >
-                <History className="w-4 h-4 shrink-0" />
-                <span>Call History logs</span>
-              </button>
-              <button
-                onClick={() => { setActiveTab("voice"); setSelectedCall(null); }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 md:w-full text-left ${
-                  activeTab === "voice" 
-                    ? "bg-indigo-600/10 text-indigo-300 border border-indigo-500/20" 
-                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent"
-                }`}
-              >
-                <Volume2 className="w-4 h-4 shrink-0" />
-                <span>Voice</span>
-              </button>
+
+
+
               <button
                 onClick={() => { setActiveTab("settings"); setSelectedCall(null); }}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 md:w-full text-left ${
