@@ -704,3 +704,128 @@ export async function updateUserStatus(targetUid: string, status: string): Promi
   );
 }
 
+
+// ─── Personality Operations ───────────────────────────────────────────────────
+export interface Personality {
+  id: string;
+  user_id: string;
+  name: string;
+  role: string;
+  communication_style: string;
+  knowledge_area: string;
+  behavior_pattern: string;
+  created_at: string;
+}
+
+export async function createPersonality(
+  userId: string,
+  name: string,
+  role: string,
+  communicationStyle: string,
+  knowledgeArea: string,
+  behaviorPattern: string
+): Promise<Personality> {
+  const record = {
+    user_id: userId,
+    name,
+    role,
+    communication_style: communicationStyle,
+    knowledge_area: knowledgeArea,
+    behavior_pattern: behaviorPattern,
+    created_at: new Date().toISOString()
+  };
+  return runWithFallback<Personality>(
+    async () => {
+      const supabase = getSupabaseAdmin();
+      const { data, error } = await supabase
+        .from("personalities")
+        .insert(record)
+        .select()
+        .single();
+      return { data: data as Personality, error };
+    },
+    async () => {
+      const docRef = await adminDb.collection("personalities").add(record);
+      return { id: docRef.id, ...record };
+    },
+    "createPersonality"
+  );
+}
+
+export async function listPersonalities(userId: string): Promise<Personality[]> {
+  return runWithFallback<Personality[]>(
+    async () => {
+      const supabase = getSupabaseAdmin();
+      const { data, error } = await supabase
+        .from("personalities")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+      return { data: data as Personality[], error };
+    },
+    async () => {
+      const snap = await adminDb.collection("personalities").where("user_id", "==", userId).get();
+      const list: Personality[] = [];
+      snap.forEach(doc => list.push({ id: doc.id, ...doc.data() } as Personality));
+      return list;
+    },
+    "listPersonalities"
+  );
+}
+
+export async function updatePersonality(
+  personalityId: string,
+  userId: string,
+  updates: Partial<Omit<Personality, "id" | "user_id" | "created_at">>
+): Promise<Personality> {
+  return runWithFallback<Personality>(
+    async () => {
+      const supabase = getSupabaseAdmin();
+      const { data, error } = await supabase
+        .from("personalities")
+        .update(updates)
+        .eq("id", personalityId)
+        .eq("user_id", userId)
+        .select()
+        .single();
+      return { data: data as Personality, error };
+    },
+    async () => {
+      const docRef = adminDb.collection("personalities").doc(personalityId);
+      await docRef.update(updates);
+      const doc = await docRef.get();
+      return { id: doc.id, ...doc.data() } as Personality;
+    },
+    "updatePersonality"
+  );
+}
+
+export async function deletePersonality(personalityId: string, userId: string): Promise<void> {
+  return runWithFallback<void>(
+    async () => {
+      const supabase = getSupabaseAdmin();
+      const { error } = await supabase
+        .from("personalities")
+        .delete()
+        .eq("id", personalityId)
+        .eq("user_id", userId);
+      return { data: undefined, error };
+    },
+    async () => {
+      await adminDb.collection("personalities").doc(personalityId).delete();
+    },
+    "deletePersonality"
+  );
+}
+
+export function buildPersonalitySystemPrompt(p: Personality, callTopic?: string): string {
+  let prompt = `You are ${p.name}, a ${p.role}.
+Your communication style: ${p.communication_style}.
+Your knowledge area: ${p.knowledge_area}.
+Your behavior pattern: ${p.behavior_pattern}.
+Stay fully in character at all times. Be natural, conversational and engaging.`;
+  if (callTopic) {
+    prompt += `\n\nThe user wants to focus this conversation on: ${callTopic}. Naturally steer towards this topic.`;
+  }
+  return prompt;
+}

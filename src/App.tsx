@@ -25,7 +25,10 @@ import {
   LayoutDashboard,
   RefreshCw,
   History,
-  Menu
+  Menu,
+  Upload,
+  Send,
+  MoreVertical
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { getSupabase } from "./lib/supabase";
@@ -37,6 +40,7 @@ import CallTopicPanel from "./components/CallTopicPanel";
 import VoiceSelectionModal from "./components/VoiceSelectionModal";
 import ThreeDotMenuModal, { AI_PERSONAS } from "./components/ThreeDotMenuModal";
 import CallContactSelectorModal from "./components/CallContactSelectorModal";
+import SidebarPanel, { type Personality } from "./components/SidebarPanel";
 
 interface LogMessage {
   id: string;
@@ -458,6 +462,9 @@ export default function App() {
   const [controlCenterTab, setControlCenterTab] = useState<"contacts" | "voice" | "history" | "settings">("contacts");
   const [showSidebarMenu, setShowSidebarMenu] = useState(false);
   const [showCallContactSelectorModal, setShowCallContactSelectorModal] = useState(false);
+  const [selectedPersonalityForCall, setSelectedPersonalityForCall] = useState<Personality | null>(null);
+  const [showSidebarPanel, setShowSidebarPanel] = useState(false);
+  const [chatInput, setChatInput] = useState("");
   const [selectedPersona, setSelectedPersona] = useState("friendly");
 
   const [liveDurationSeconds, setLiveDurationSeconds] = useState(0);
@@ -485,6 +492,7 @@ export default function App() {
   // Call History, Contact Directory, and Active Call States
   const [calls, setCalls] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
+  const [personalities, setPersonalities] = useState<Personality[]>([]);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [activeCallSessionId, setActiveCallSessionId] = useState<string | null>(null);
@@ -601,6 +609,20 @@ export default function App() {
     }
   }, [authToken]);
 
+
+  const fetchPersonalities = useCallback(async () => {
+    if (!authToken) return;
+    try {
+      const res = await fetch("/api/personalities", {
+        headers: { "Authorization": `Bearer ${authToken}` }
+      });
+      const data = await res.json();
+      if (data.success) setPersonalities(data.personalities || []);
+    } catch (err) {
+      console.error("Failed to fetch personalities:", err);
+    }
+  }, [authToken]);
+
   const fetchPreferences = useCallback(async () => {
     if (!authToken) return;
     try {
@@ -675,8 +697,9 @@ export default function App() {
       fetchCalls();
       fetchContacts();
       fetchPreferences();
+      fetchPersonalities();
     }
-  }, [authToken, fetchCalls, fetchContacts, fetchPreferences]);
+  }, [authToken, fetchCalls, fetchContacts, fetchPreferences, fetchPersonalities]);
 
   const handleCreateContact = async (name: string, company: string, phone: string, notes: string) => {
     if (!authToken) return;
@@ -726,7 +749,7 @@ export default function App() {
   }, []);
 
   // Establish WebSocket connection & build Gemini Live Session
-  const startCallSession = useCallback((overrideContactId?: string | null) => {
+  const startCallSession = useCallback((overrideContactId?: string | null, personalityId?: string) => {
     if (wsRef.current) {
       wsRef.current.close();
     }
@@ -758,6 +781,7 @@ export default function App() {
           voiceId: selectedVoice,
           contactId: targetContactId,
           callTopic: activeTopicRef.current,
+          personalityId: personalityId || undefined,
         };
         socket.send(JSON.stringify({ type: "config", data: setupPayload }));
         addLog("out", "config", setupPayload);
@@ -1002,12 +1026,18 @@ export default function App() {
   }, [addLog]);
 
   // Handle connection trigger
-  const handlePlaceCall = (overrideContactId?: string | null) => {
-    activePromptRef.current = systemPrompt;
-    activeTopicRef.current = callTopic;
+  const handlePlaceCall = (overrideContactId?: string | null, personality?: Personality | null) => {
+    if (personality) {
+      setSelectedPersonalityForCall(personality);
+      activeTopicRef.current = callTopic;
+      // Don't override the prompt — server builds it from personalityId
+    } else {
+      activePromptRef.current = systemPrompt;
+      activeTopicRef.current = callTopic;
+    }
     callStartTimeRef.current = Date.now();
     const targetContactId = overrideContactId !== undefined ? overrideContactId : selectedContactId;
-    startCallSession(targetContactId);
+    startCallSession(targetContactId, personality?.id);
   };
 
   // Preset prompts to help user bootstrap
@@ -1132,601 +1162,37 @@ export default function App() {
     );
   }
 
+  // ─── Determine active personality name for call header ───────────────────────
+  const activePersonalityName = selectedPersonalityForCall?.name || "AI Assistant";
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200 relative overflow-x-hidden">
-      
-      {/* Immersive visual dynamic lighting spheres */}
+
+      {/* Ambient lighting */}
       <div className="absolute top-0 left-1/3 w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-violet-600/10 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* User Profile Modal Overlay */}
+      {/* ── Modals ── */}
       <AnimatePresence>
         {showProfileModal && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-lg"
-            >
-              <UserProfileModal
-                user={user}
-                userRole={userRole}
-                userStatus={userStatus}
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-[200]">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="w-full max-w-lg">
+              <UserProfileModal user={user} userRole={userRole} userStatus={userStatus}
                 onClose={() => setShowProfileModal(false)}
-                onLogout={async () => {
-                  setShowProfileModal(false);
-                  await getSupabase().auth.signOut();
-                }}
-              />
+                onLogout={async () => { setShowProfileModal(false); await getSupabase().auth.signOut(); }} />
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-
-      {/* Admin Dashboard Overlay */}
       <AnimatePresence>
         {showAdminConsole && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-5xl h-[85vh]"
-            >
-              <AdminConsole
-                authToken={authToken}
-                onClose={() => setShowAdminConsole(false)}
-              />
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-[200]">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="w-full max-w-5xl h-[85vh]">
+              <AdminConsole authToken={authToken} onClose={() => setShowAdminConsole(false)} />
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-
-      {/* Voice Selection Modal Overlay */}
-      <AnimatePresence>
-        {showVoiceModal && (
-          <VoiceSelectionModal
-            currentVoiceId={selectedVoice}
-            voices={VOICES}
-            onSave={handleSaveVoicePreference}
-            onClose={() => setShowVoiceModal(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Sidebar Menu dropdown -- rendered at root level (not inside <header>) so it always
-          paints above <main> instead of being covered/clipped by it, and so taps land
-          correctly instead of hitting whatever main content sits underneath. */}
-      <AnimatePresence>
-        {showSidebarMenu && (
-          <>
-            {/* Click-outside backdrop to close */}
-            <div
-              className="fixed inset-0 z-[90]"
-              onClick={() => setShowSidebarMenu(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: -8, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.97 }}
-              transition={{ duration: 0.15 }}
-              className="fixed top-[4.25rem] right-4 sm:right-6 w-52 bg-slate-900/95 border border-white/10 rounded-2xl p-2 backdrop-blur-md shadow-2xl z-[100] flex flex-col gap-1"
-            >
-              {([
-                { tab: "contacts", label: "Contact", icon: User },
-                { tab: "voice", label: "Voice", icon: Volume2 },
-                { tab: "history", label: "Call History Logs", icon: History },
-                { tab: "settings", label: "System Settings", icon: Settings },
-              ] as const).map(({ tab, label, icon: Icon }) => (
-                <button
-                  key={tab}
-                  onClick={() => {
-                    setControlCenterTab(tab);
-                    setShowThreeDotMenuModal(true);
-                    setShowSidebarMenu(false);
-                  }}
-                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-all cursor-pointer text-left"
-                >
-                  <Icon className="w-4 h-4 text-indigo-400 shrink-0" />
-                  <span>{label}</span>
-                </button>
-              ))}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Main RESPONSIVE AI Header */}
-      <header className="border-b border-white/5 bg-slate-950/60 backdrop-blur-md relative z-10">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Phone className="w-5 h-5 text-white animate-pulse" />
-            </div>
-            <div>
-              <span className="font-semibold text-white tracking-tight block text-sm sm:text-base">RESPONSIVE AI</span>
-              <span className="text-[10px] text-indigo-400 font-mono uppercase tracking-widest block -mt-1">Duplex Voice Node</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            {/* Profile trigger */}
-            <button
-              onClick={() => setShowProfileModal(true)}
-              className="p-2 rounded-lg border border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all text-xs flex items-center gap-1.5 cursor-pointer"
-              title="Manage Account Profile"
-            >
-              <User className="w-4 h-4" />
-              <span className="hidden md:inline">{user?.displayName || "My Profile"}</span>
-            </button>
-
-            {/* Sidebar Menu toggle -- click to reveal Contact / Voice / History / Settings.
-                The dropdown itself is rendered at root level (see top-level overlays below)
-                so it always paints above <main> and is never clipped or covered. */}
-            <button
-              onClick={() => setShowSidebarMenu((v) => !v)}
-              className={`p-2 rounded-lg border transition-all text-xs flex items-center gap-1.5 cursor-pointer ${
-                showSidebarMenu
-                  ? "border-indigo-500/40 bg-indigo-600/10 text-indigo-300"
-                  : "border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-              title="Menu"
-            >
-              <Menu className="w-4 h-4" />
-              <span className="hidden md:inline">Menu</span>
-            </button>
-
-            {/* Discreet Aesthetic Hidden Entry Symbol */}
-            <button
-              onClick={() => navigateTo("admin")}
-              className="w-1.5 h-1.5 rounded-full bg-slate-700/30 hover:bg-slate-500/40 active:scale-90 transition-all cursor-pointer self-center ml-1"
-              aria-label="System Accent"
-            />
-
-          </div>
-        </div>
-      </header>
-
-      {/* Core Interface Workspace */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col justify-center">
-
-        <AnimatePresence mode="wait">
-          
-          {/* STAGE 1: Minimalist Apple-Style Pre-Call Dialer Stage */}
-          {callState === "idle" && (
-            <motion.div
-              key="minimal-dialer"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="flex flex-col items-center justify-center py-8 space-y-8 max-w-md mx-auto w-full"
-            >
-              {/* Contact Stage Card */}
-              <div className="text-center space-y-4 w-full">
-                {/* Large Apple-style Avatar bubble */}
-                <div className="relative mx-auto w-28 h-28">
-                  <div className="absolute inset-0 bg-indigo-500/20 rounded-full blur-xl animate-pulse" />
-                  <div className="relative w-28 h-28 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center shadow-2xl">
-                    {selectedContactId ? (
-                      <span className="text-3xl font-black text-indigo-300 select-none">
-                        {contacts.find(c => c.id === selectedContactId)?.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
-                      </span>
-                    ) : (
-                      <User className="w-12 h-12 text-slate-500" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Contact Name & Company details */}
-                <div className="space-y-1">
-                  <h1 className="text-2xl font-black tracking-tight text-white">
-                    {selectedContactId 
-                      ? contacts.find(c => c.id === selectedContactId)?.name 
-                      : "No Contact Selected"
-                    }
-                  </h1>
-                  <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">
-                    {selectedContactId 
-                      ? (contacts.find(c => c.id === selectedContactId)?.company || "Independent client") 
-                      : "Choose a contact profile to initiate call"
-                    }
-                  </p>
-                </div>
-
-                {/* Active settings indicators pill */}
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[10px] font-bold text-indigo-300 font-mono uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>
-                    {AI_PERSONAS.find(p => p.id === selectedPersona)?.name || "Friendly Persona"}
-                  </span>
-                  <span className="text-indigo-600/60">•</span>
-                  <span>
-                    Voice: {VOICES.find(v => v.id === selectedVoice)?.name || selectedVoice}
-                  </span>
-                </div>
-              </div>
-
-              {/* AI Persona Core -- persona picker + call topic, front and center on the
-                  main screen now (previously buried inside the 3-dot Control Center) */}
-              <div className="w-full bg-slate-900/40 border border-white/5 rounded-3xl p-4.5 backdrop-blur-md shadow-xl space-y-3">
-                <span className="text-[9px] font-mono font-bold text-slate-500 block uppercase tracking-widest flex items-center gap-1.5">
-                  <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-                  AI Persona Core
-                </span>
-
-                <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-thin">
-                  {AI_PERSONAS.map((p) => {
-                    const isCurrent = selectedPersona === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => {
-                          if (!isCurrent) handleSavePersonaPreference(p.id);
-                        }}
-                        className={`flex-shrink-0 px-3 py-2 rounded-xl border text-left transition-all text-[11px] font-bold flex items-center gap-2 cursor-pointer ${
-                          isCurrent
-                            ? "bg-indigo-600/10 border-indigo-500/40 text-indigo-200"
-                            : "bg-black/20 border-white/5 text-slate-400 hover:border-white/10"
-                        }`}
-                      >
-                        <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-tr ${p.color} shrink-0`} />
-                        <span>{p.name.split(" ").pop()}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <CallTopicPanel
-                  value={callTopic}
-                  onChange={setCallTopic}
-                  isLive={false}
-                  onSendLive={() => {}}
-                  compact
-                />
-              </div>
-
-              {/* Glowing Green Phone Dial Button */}
-              <div className="pt-2">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    if (selectedContactId) {
-                      handlePlaceCall();
-                    } else {
-                      setShowCallContactSelectorModal(true);
-                    }
-                  }}
-                  className="w-20 h-20 bg-gradient-to-tr from-emerald-600 to-emerald-400 hover:from-emerald-500 hover:to-emerald-300 text-white rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/35 transition-all cursor-pointer border border-emerald-400/20 relative group"
-                  title="Place Call Session"
-                >
-                  <div className="absolute inset-0 rounded-full bg-emerald-500/25 animate-ping group-hover:opacity-75 pointer-events-none" />
-                  <Phone className="w-9 h-9 fill-current" />
-                </motion.button>
-                <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest text-center mt-3.5">
-                  Start call session
-                </span>
-              </div>
-            </motion.div>
-          )}
-
-          {/* STAGE 2: Immersive Call Cockpit with integrated side panels */}
-          {callState !== "idle" && (
-            <motion.div
-              key="active-call-cockpit"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="space-y-6 w-full"
-            >
-              {/* Main caller grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                
-                {/* Left Side: Call Screen Stage & controls */}
-                <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-6 md:p-8 backdrop-blur-md flex flex-col items-center justify-center space-y-6 shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-pink-500 to-rose-400 opacity-60" />
-
-                  {/* Caller Details Info */}
-                  <div className="text-center space-y-2">
-                    {/* Pulsing Avatar Stage */}
-                    <div className="relative mx-auto w-24 h-24">
-                      {/* Speaks animation waves */}
-                      <AnimatePresence>
-                        {pipelineState === "speaking" && (
-                          <>
-                            <motion.div 
-                              initial={{ scale: 0.95, opacity: 0 }}
-                              animate={{ scale: [1, 1.4, 1], opacity: [0.1, 0.3, 0.1] }}
-                              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                              className="absolute inset-0 rounded-full bg-indigo-500/20 blur-md"
-                            />
-                            <motion.div 
-                              initial={{ scale: 0.95, opacity: 0 }}
-                              animate={{ scale: [1, 1.8, 1], opacity: [0.05, 0.15, 0.05] }}
-                              transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-                              className="absolute inset-0 rounded-full bg-indigo-500/10 blur-lg"
-                            />
-                          </>
-                        )}
-                        {pipelineState === "listening" && (
-                          <motion.div 
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: [1, 1.25, 1], opacity: [0.1, 0.25, 0.1] }}
-                            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                            className="absolute inset-0 rounded-full bg-emerald-500/20 blur-md"
-                          />
-                        )}
-                      </AnimatePresence>
-
-                      <div className={`relative w-24 h-24 rounded-full bg-slate-950 border flex items-center justify-center shadow-inner transition-all duration-500 ${
-                        pipelineState === "speaking" ? "border-indigo-500/40 shadow-lg shadow-indigo-500/10" :
-                        pipelineState === "listening" ? "border-emerald-500/40 shadow-lg shadow-emerald-500/10" : "border-white/5"
-                      }`}>
-                        {selectedContactId ? (
-                          <span className="text-2xl font-black text-indigo-300 select-none">
-                            {contacts.find(c => c.id === selectedContactId)?.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
-                          </span>
-                        ) : (
-                          <User className="w-10 h-10 text-slate-400" />
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-mono font-bold text-slate-500 tracking-widest block uppercase">
-                        {pipelineState === "speaking" ? "AI Speaking" :
-                         pipelineState === "listening" ? (isMuted ? "Muted" : "Listening...") :
-                         pipelineState === "thinking" ? "Thinking..." : "Secure Connection"
-                        }
-                      </span>
-                      <h2 className="text-xl font-extrabold text-white">
-                        {selectedContactId 
-                          ? contacts.find(c => c.id === selectedContactId)?.name 
-                          : "Anonymous Caller"
-                        }
-                      </h2>
-                      
-                      {/* Call Timer Display */}
-                      <span className="font-mono text-sm font-bold text-slate-300 block">
-                        {callState === "active" ? formatLiveDuration(liveDurationSeconds) : "Connecting..."}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Pulsing Visual Waveform Bars */}
-                  <div className="h-10 flex items-center justify-center gap-1 bg-black/25 border border-white/5 px-6 py-2.5 rounded-2xl w-full">
-                    {pipelineState === "speaking" || pipelineState === "listening" ? (
-                      [...Array(11)].map((_, i) => (
-                        <motion.div 
-                          key={i}
-                          animate={{ height: [4, i % 2 === 0 ? 28 : 16, 4] }}
-                          transition={{ repeat: Infinity, duration: 0.3 + i * 0.05, ease: "easeInOut" }}
-                          className={`w-1 rounded-full ${pipelineState === "listening" ? "bg-emerald-400" : "bg-indigo-400"}`}
-                        />
-                      ))
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 font-bold uppercase tracking-wider">
-                        <Activity className="w-4.5 h-4.5 text-slate-600 animate-pulse" />
-                        <span>Awaiting duplex speech...</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Primary Tool Controllers */}
-                  <div className="flex items-center justify-center gap-3.5 w-full">
-                    {/* Mute Button */}
-                    <button
-                      onClick={() => setIsMuted(!isMuted)}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                        isMuted 
-                          ? "bg-rose-500/15 border-rose-500/30 text-rose-400" 
-                          : "bg-slate-950 border border-white/10 text-slate-400 hover:text-white hover:bg-slate-900"
-                      }`}
-                      title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
-                    >
-                      {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                    </button>
-
-                    {/* End Call Button */}
-                    <motion.button
-                      whileHover={{ scale: 1.04 }}
-                      whileTap={{ scale: 0.96 }}
-                      onClick={hangUpCall}
-                      className="px-6 py-3.5 bg-gradient-to-tr from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 text-white font-extrabold rounded-2xl flex items-center gap-2 text-xs shadow-lg shadow-red-500/25 cursor-pointer border border-red-500/20"
-                      title="Hang up Call"
-                    >
-                      <PhoneOff className="w-4 h-4" />
-                      <span>End Conversation</span>
-                    </motion.button>
-
-                    {/* Interruption Button */}
-                    <button
-                      disabled={!isPlaying}
-                      onClick={stopPlayback}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                        isPlaying 
-                          ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/25" 
-                          : "bg-slate-950 border border-white/5 text-slate-600 cursor-not-allowed"
-                      }`}
-                      title="Stop Speech (Interrupt)"
-                    >
-                      <VolumeX className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  {/* Mid-Call Persona & Voice Hot-Swapping Panel */}
-                  <div className="w-full border-t border-white/5 pt-4.5 space-y-4">
-                    {/* Voice hot swapper */}
-                    <div className="space-y-2">
-                      <span className="text-[9px] font-mono font-bold text-slate-500 block uppercase tracking-widest">
-                        Hot-Swap Voice Actor
-                      </span>
-                      <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-thin">
-                        {VOICES.map((voice) => {
-                          const isCurrent = selectedVoice === voice.id;
-                          return (
-                            <button
-                              key={voice.id}
-                              disabled={isSwappingVoice}
-                              onClick={() => {
-                                if (!isCurrent) {
-                                  setIsSwappingVoice(true);
-                                  changeVoiceMidCall(voice.id);
-                                }
-                              }}
-                              className={`flex-shrink-0 px-3 py-2 rounded-xl border text-left transition-all text-[11px] font-bold flex items-center gap-2 cursor-pointer ${
-                                isCurrent
-                                  ? "bg-indigo-600/10 border-indigo-500/40 text-indigo-200"
-                                  : "bg-black/20 border-white/5 text-slate-400 hover:border-white/10"
-                              }`}
-                            >
-                              <div className={`w-4 h-4 rounded-sm bg-gradient-to-tr ${voice.avatarBg} flex items-center justify-center text-[8px] font-black text-white shrink-0`}>
-                                {voice.name[0]}
-                              </div>
-                              <span>{voice.name}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Persona hot swapper */}
-                    <div className="space-y-2 border-t border-white/[0.03] pt-3.5">
-                      <span className="text-[9px] font-mono font-bold text-slate-500 block uppercase tracking-widest">
-                        Hot-Swap AI Persona Context
-                      </span>
-                      <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-thin">
-                        {AI_PERSONAS.map((p) => {
-                          const isCurrent = selectedPersona === p.id;
-                          return (
-                            <button
-                              key={p.id}
-                              onClick={() => {
-                                if (!isCurrent) {
-                                  setSelectedPersona(p.id);
-                                  changePersonaMidCall(p.id);
-                                }
-                              }}
-                              className={`flex-shrink-0 px-3 py-2 rounded-xl border text-left transition-all text-[11px] font-bold flex items-center gap-2 cursor-pointer ${
-                                isCurrent
-                                  ? "bg-indigo-600/10 border-indigo-500/40 text-indigo-200"
-                                  : "bg-black/20 border-white/5 text-slate-400 hover:border-white/10"
-                              }`}
-                            >
-                              <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-tr ${p.color} shrink-0`} />
-                              <span>{p.name.split(" ").pop()}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Right Side: Intelligent Co-Pilot commands (live transcript view removed --
-                    conversation is still recorded and saved silently in the background) */}
-                <div className="grid grid-cols-1 gap-6">
-                  <CallTopicPanel
-                    value={callTopic}
-                    onChange={setCallTopic}
-                    isLive={true}
-                    onSendLive={sendLiveDirective}
-                  />
-                </div>
-
-              </div>
-            </motion.div>
-          )}
-
-        </AnimatePresence>
-
-        {/* TELEMETRY PACKET CONSOLE */}
-        <AnimatePresence>
-          {showDevConsole && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-6 border border-white/10 rounded-3xl bg-slate-950 overflow-hidden flex flex-col max-h-[250px]"
-            >
-              {/* Header console */}
-              <div className="bg-white/[0.02] border-b border-white/10 p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Terminal className="w-4 h-4 text-indigo-400 animate-pulse" />
-                  <span className="text-xs font-bold text-white">Full-Duplex Packet Telemetry</span>
-                </div>
-                <button 
-                  onClick={() => setLogs([])}
-                  className="text-[10px] font-mono text-slate-400 hover:text-white transition-all bg-white/5 border border-white/15 px-2 py-0.5 rounded cursor-pointer"
-                >
-                  Clear Logs
-                </button>
-              </div>
-
-              {/* Filters panel */}
-              <div className="bg-slate-900/30 border-b border-white/5 px-4 py-1.5 flex items-center gap-1.5">
-                <span className="text-[10px] text-slate-500 font-mono">FILTER:</span>
-                {(["all", "in", "out", "system"] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setFilterType(type)}
-                    className={`px-2 py-0.5 rounded text-[10px] font-mono capitalize transition-all cursor-pointer ${
-                      filterType === type 
-                        ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold" 
-                        : "text-slate-500 hover:text-slate-300"
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-
-              {/* Scrollable logs list */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs scrollbar-thin">
-                {logs.filter(log => filterType === "all" || log.type === filterType).length === 0 ? (
-                  <div className="text-slate-600 text-[11px] italic py-8 text-center">
-                    No active telemetry log entries.
-                  </div>
-                ) : (
-                  logs.filter(log => filterType === "all" || log.type === filterType).map((log) => (
-                    <div key={log.id} className="border-b border-white/[0.03] pb-2 last:border-b-0">
-                      <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`px-1 rounded uppercase tracking-tight text-[8px] font-bold ${
-                            log.type === "in" 
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
-                              : log.type === "out" 
-                              ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" 
-                              : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
-                          }`}>
-                            {log.type === "in" ? "← Rx" : log.type === "out" ? "→ Tx" : "Sys"}
-                          </span>
-                          <span className="font-semibold text-slate-300">{log.event}</span>
-                        </div>
-                        <span>{log.timestamp}</span>
-                      </div>
-
-                      <pre className="text-[10px] text-slate-400 bg-black/40 p-2 rounded border border-white/5 overflow-x-auto whitespace-pre-wrap max-h-24 scrollbar-thin">
-                        {typeof log.payload === "object" 
-                          ? JSON.stringify(log.payload, null, 2) 
-                          : String(log.payload)
-                        }
-                      </pre>
-                    </div>
-                  ))
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-      </main>
-
-      {/* Modern overlays */}
       <AnimatePresence>
         {showThreeDotMenuModal && (
           <ThreeDotMenuModal
@@ -1736,56 +1202,319 @@ export default function App() {
             contacts={contacts}
             selectedContactId={selectedContactId}
             onSelectContact={setSelectedContactId}
-            onCreateContact={handleCreateContact}
-            onDeleteContact={handleDeleteContact}
+            onCreateContact={async () => {}}
+            onDeleteContact={async () => {}}
             calls={calls}
             authToken={authToken}
             user={user}
             userRole={userRole}
             selectedVoice={selectedVoice}
-            onSelectVoice={(voiceId) => {
-              handleSaveVoicePreference(voiceId);
-            }}
-            onOpenAdmin={() => {
-              navigateTo("admin");
-            }}
+            onSelectVoice={handleSaveVoicePreference}
+            onOpenAdmin={() => navigateTo("admin")}
             showDevConsole={showDevConsole}
             onToggleDevConsole={() => setShowDevConsole(!showDevConsole)}
           />
         )}
-
-        {showCallContactSelectorModal && (
-          <CallContactSelectorModal
-            isOpen={showCallContactSelectorModal}
-            onClose={() => setShowCallContactSelectorModal(false)}
-            contacts={contacts}
-            onSelectAndStartCall={(contactId) => {
-              setSelectedContactId(contactId);
-              setShowCallContactSelectorModal(false);
-              handlePlaceCall(contactId);
-            }}
-            onCreateContact={handleCreateContact}
-          />
-        )}
       </AnimatePresence>
 
-      {/* Footer */}
-      <footer className="py-6 border-t border-white/5 text-center text-[11px] text-slate-500 relative z-10 flex flex-col items-center justify-center gap-1.5 bg-slate-950">
-        <p>RESPONSIVE AI</p>
-        <div className="flex items-center gap-2 text-slate-600/80">
-          <span>v1.3.0</span>
-          <span className="text-slate-800 select-none">•</span>
-          <span>Secure Connection Active</span>
+      {/* ── New Sidebar Panel ── */}
+      <SidebarPanel
+        isOpen={showSidebarPanel}
+        onClose={() => setShowSidebarPanel(false)}
+        voices={VOICES}
+        selectedVoice={selectedVoice}
+        onVoiceSelect={(v) => { handleSaveVoicePreference(v); }}
+        personalities={personalities}
+        recentCalls={calls.map(c => ({
+          id: c.id,
+          personality_name: c.personality_name || c.contact_name || "AI Assistant",
+          created_at: c.created_at,
+          duration_seconds: c.duration_seconds || 0
+        }))}
+        authToken={authToken}
+        onPersonalitiesChange={setPersonalities}
+        onStartCall={(personality) => {
+          setSelectedPersonalityForCall(personality);
+          handlePlaceCall(null, personality);
+        }}
+        onOpenSettings={() => {
+          setControlCenterTab("settings");
+          setShowThreeDotMenuModal(true);
+        }}
+      />
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          HEADER
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <header className="border-b border-white/5 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+          {/* Left: hamburger → Profile */}
           <button
-            onClick={() => navigateTo("admin")}
-            className="text-slate-800/40 hover:text-slate-500/60 active:scale-90 transition-all cursor-pointer select-none ml-0.5 p-1 rounded"
-            aria-label="System Accent"
+            onClick={() => setShowProfileModal(true)}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+            title="Profile"
           >
-            ✦
+            <User className="w-5 h-5" />
+          </button>
+
+          {/* Center: AI Name */}
+          <div className="flex flex-col items-center">
+            <span className="font-bold text-white text-sm tracking-tight">RESPONSIVE AI</span>
+            {callState === "active" && (
+              <span className="text-[9px] text-emerald-400 font-mono uppercase tracking-widest animate-pulse">
+                Live · {formatLiveDuration(liveDurationSeconds)}
+              </span>
+            )}
+          </div>
+
+          {/* Right: three-dot → sidebar */}
+          <button
+            onClick={() => setShowSidebarPanel(true)}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+            title="Menu"
+          >
+            <MoreVertical className="w-5 h-5" />
           </button>
         </div>
-      </footer>
+      </header>
 
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MAIN — switches between HOME and LIVE CALL
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <main className="flex-1 flex flex-col max-w-2xl w-full mx-auto relative z-10">
+        <AnimatePresence mode="wait">
+
+          {/* ── HOME SCREEN ── */}
+          {(callState === "idle" || callState === "connecting" || callState === "ringing" || callState === "ended") && (
+            <motion.div
+              key="home"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              className="flex-1 flex flex-col"
+            >
+              {/* AI Core Chat Feed */}
+              <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
+                {/* AI Personal Core card pinned at top */}
+                <div className="flex gap-3 items-start">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="bg-slate-900/60 border border-white/5 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-300 max-w-xs leading-relaxed">
+                    {selectedPersonalityForCall
+                      ? <>I'm <span className="text-indigo-300 font-semibold">{selectedPersonalityForCall.name}</span> — {selectedPersonalityForCall.role}. Ready when you are.</>
+                      : <>Hi! I'm your <span className="text-indigo-300 font-semibold">AI Assistant</span>. Open the menu to choose a personality, then start a call.</>
+                    }
+                  </div>
+                </div>
+
+                {/* Chat history from previous calls */}
+                {chatHistory.map(turn => (
+                  <div key={turn.id} className={`flex gap-3 items-start ${turn.sender === "user" ? "flex-row-reverse" : ""}`}>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${turn.sender === "user" ? "bg-indigo-600/30 border border-indigo-500/20" : "bg-slate-800 border border-white/5"}`}>
+                      {turn.sender === "user" ? <Mic className="w-3 h-3 text-indigo-400" /> : <Sparkles className="w-3 h-3 text-violet-400" />}
+                    </div>
+                    <div className={`px-3 py-2 rounded-2xl text-xs max-w-[70%] leading-relaxed ${turn.sender === "user" ? "bg-indigo-600/15 border border-indigo-500/20 text-white rounded-tr-sm" : "bg-slate-900/60 border border-white/5 text-slate-300 rounded-tl-sm"}`}>
+                      {turn.text}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Connecting state indicator */}
+                {(callState === "connecting" || callState === "ringing") && (
+                  <div className="flex gap-3 items-start">
+                    <div className="w-7 h-7 rounded-full bg-slate-800 border border-white/5 flex items-center justify-center shrink-0">
+                      <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin" />
+                    </div>
+                    <div className="bg-slate-900/60 border border-white/5 rounded-2xl rounded-tl-sm px-3 py-2 text-xs text-slate-400">
+                      {callState === "connecting" ? "Connecting to AI…" : "Ringing…"}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Typing Bar + Call trigger */}
+              <div className="px-4 py-3 border-t border-white/5 bg-slate-950/80 backdrop-blur-md flex gap-2 items-end shrink-0">
+                <div className="flex-1 bg-slate-900/60 border border-white/8 rounded-2xl flex items-end gap-2 px-3 py-2.5 min-h-[44px]">
+                  <textarea
+                    value={chatInput}
+                    onChange={(e) => { setChatInput(e.target.value); setCallTopic(e.target.value); }}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) { sendLiveDirective(chatInput); setChatInput(""); } } }}
+                    placeholder={selectedPersonalityForCall ? `Send a directive to ${selectedPersonalityForCall.name}…` : "Type a command or directive…"}
+                    rows={1}
+                    className="flex-1 bg-transparent text-sm text-white placeholder-slate-600 resize-none focus:outline-none leading-relaxed"
+                    style={{ maxHeight: "100px" }}
+                  />
+                  {chatInput.trim() && (
+                    <button onClick={() => { sendLiveDirective(chatInput); setChatInput(""); }} className="text-indigo-400 hover:text-indigo-300 transition-all shrink-0">
+                      <Send className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {/* Call button */}
+                <button
+                  onClick={() => handlePlaceCall(null, selectedPersonalityForCall || undefined)}
+                  disabled={callState === "connecting" || callState === "ringing"}
+                  className="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 flex items-center justify-center transition-all shadow-lg shadow-indigo-500/20 shrink-0"
+                  title="Start Call"
+                >
+                  <Phone className="w-4.5 h-4.5 text-white" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── LIVE CALL SCREEN ── */}
+          {callState === "active" && (
+            <motion.div
+              key="live"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              className="flex-1 flex flex-col"
+            >
+              {/* Call Header */}
+              <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">Calling: {activePersonalityName}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[9px] text-emerald-400 font-mono uppercase tracking-widest">
+                      {pipelineState === "speaking" ? "AI Speaking" : pipelineState === "listening" ? "Listening" : "Live"} · {formatLiveDuration(liveDurationSeconds)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live conversation feed */}
+              <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
+                {chatHistory.map(turn => (
+                  <div key={turn.id} className={`flex gap-3 items-start ${turn.sender === "user" ? "flex-row-reverse" : ""}`}>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${turn.sender === "user" ? "bg-indigo-600/30 border border-indigo-500/20" : "bg-slate-800 border border-white/5"}`}>
+                      {turn.sender === "user" ? <Mic className="w-3 h-3 text-indigo-400" /> : <Sparkles className="w-3 h-3 text-violet-400" />}
+                    </div>
+                    <div className={`px-3 py-2 rounded-2xl text-xs max-w-[70%] leading-relaxed ${turn.sender === "user" ? "bg-indigo-600/15 border border-indigo-500/20 text-white rounded-tr-sm" : "bg-slate-900/60 border border-white/5 text-slate-300 rounded-tl-sm"}`}>
+                      {turn.text}
+                    </div>
+                  </div>
+                ))}
+                {currentAiText && (
+                  <div className="flex gap-3 items-start">
+                    <div className="w-7 h-7 rounded-full bg-slate-800 border border-white/5 flex items-center justify-center shrink-0">
+                      <Sparkles className="w-3 h-3 text-violet-400 animate-pulse" />
+                    </div>
+                    <div className="bg-slate-900/60 border border-indigo-500/10 rounded-2xl rounded-tl-sm px-3 py-2 text-xs text-slate-300 max-w-[70%] leading-relaxed">
+                      {currentAiText}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Live Call Controls */}
+              <div className="px-4 py-3 border-t border-white/5 bg-slate-950/80 backdrop-blur-md shrink-0">
+                {/* Control buttons row */}
+                <div className="flex items-center justify-between mb-3">
+                  {/* Mute */}
+                  <button
+                    onClick={() => setIsMuted(m => !m)}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all ${isMuted ? "bg-red-500/15 border-red-500/30 text-red-400" : "bg-white/5 border-white/8 text-slate-400 hover:text-white"}`}
+                    title={isMuted ? "Unmute" : "Mute"}
+                  >
+                    {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    <span className="text-[8px] font-black uppercase tracking-wider">{isMuted ? "Unmute" : "Mute"}</span>
+                  </button>
+
+                  {/* Voice swap */}
+                  <button
+                    onClick={() => setShowSidebarPanel(true)}
+                    className="flex flex-col items-center gap-1 p-3 rounded-2xl border border-white/8 bg-white/5 text-slate-400 hover:text-white transition-all"
+                    title="Change Voice"
+                  >
+                    <Volume2 className="w-5 h-5" />
+                    <span className="text-[8px] font-black uppercase tracking-wider">Voice</span>
+                  </button>
+
+                  {/* File upload */}
+                  <label className="flex flex-col items-center gap-1 p-3 rounded-2xl border border-white/8 bg-white/5 text-slate-400 hover:text-white transition-all cursor-pointer" title="Upload File">
+                    <Upload className="w-5 h-5" />
+                    <span className="text-[8px] font-black uppercase tracking-wider">Upload</span>
+                    <input type="file" accept=".pdf,.txt,.doc,.docx" className="sr-only"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !authToken) return;
+                        const fd = new FormData();
+                        fd.append("file", file);
+                        try {
+                          const res = await fetch("/api/calls/upload-context", {
+                            method: "POST",
+                            headers: { Authorization: `Bearer ${authToken}` },
+                            body: fd
+                          });
+                          const d = await res.json();
+                          if (d.success && d.summary) {
+                            sendLiveDirective(`[DOCUMENT CONTEXT UPLOADED] The user has provided a document for reference. Summary: ${d.summary}`);
+                          }
+                        } catch (err) { console.error("Upload failed:", err); }
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+
+                  {/* End call */}
+                  <button
+                    onClick={hangUpCall}
+                    className="flex flex-col items-center gap-1 p-3 rounded-2xl border border-red-500/30 bg-red-500/15 text-red-400 hover:bg-red-500/25 hover:text-red-300 transition-all"
+                    title="End Call"
+                  >
+                    <PhoneOff className="w-5 h-5" />
+                    <span className="text-[8px] font-black uppercase tracking-wider">End</span>
+                  </button>
+                </div>
+
+                {/* Typing bar during call */}
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1 bg-slate-900/60 border border-white/8 rounded-2xl flex items-end gap-2 px-3 py-2.5 min-h-[40px]">
+                    <textarea
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          if (chatInput.trim()) { sendLiveDirective(chatInput); setChatInput(""); }
+                        }
+                      }}
+                      placeholder="Send a live directive to the AI…"
+                      rows={1}
+                      className="flex-1 bg-transparent text-xs text-white placeholder-slate-600 resize-none focus:outline-none"
+                      style={{ maxHeight: "80px" }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => { if (chatInput.trim()) { sendLiveDirective(chatInput); setChatInput(""); } }}
+                    disabled={!chatInput.trim()}
+                    className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 flex items-center justify-center transition-all shrink-0"
+                  >
+                    <Send className="w-4 h-4 text-white" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+      </main>
+
+      {/* Discreet admin access */}
+      <button
+        onClick={() => navigateTo("admin")}
+        className="fixed bottom-4 right-4 w-1.5 h-1.5 rounded-full bg-slate-700/30 hover:bg-slate-500/40 active:scale-90 transition-all cursor-pointer z-10"
+        aria-label="System"
+      />
     </div>
   );
 }

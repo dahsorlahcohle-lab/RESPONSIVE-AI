@@ -29,6 +29,7 @@ import {
   formatConversationMemoryForPrompt,
   resolveContactId
 } from "./src/lib/db-fallback";
+import { createPersonality, listPersonalities, updatePersonality, deletePersonality, buildPersonalitySystemPrompt, type Personality } from "./src/lib/db-fallback";
 
 dotenv.config();
 
@@ -224,6 +225,47 @@ async function startServer() {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+  // ─── Personality CRUD Routes ─────────────────────────────────────────────────
+  app.get("/api/personalities", authenticateUser, async (req: any, res: any) => {
+    try {
+      const list = await listPersonalities(req.user.uid);
+      res.json({ success: true, personalities: list });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/personalities", authenticateUser, async (req: any, res: any) => {
+    const { name, role, communication_style, knowledge_area, behavior_pattern } = req.body;
+    if (!name || !role) return res.status(400).json({ success: false, error: "name and role are required" });
+    try {
+      const p = await createPersonality(req.user.uid, name, role, communication_style || "", knowledge_area || "", behavior_pattern || "");
+      res.json({ success: true, personality: p });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put("/api/personalities/:id", authenticateUser, async (req: any, res: any) => {
+    const { name, role, communication_style, knowledge_area, behavior_pattern } = req.body;
+    try {
+      const p = await updatePersonality(req.params.id, req.user.uid, { name, role, communication_style, knowledge_area, behavior_pattern });
+      res.json({ success: true, personality: p });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete("/api/personalities/:id", authenticateUser, async (req: any, res: any) => {
+    try {
+      await deletePersonality(req.params.id, req.user.uid);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // List call history for the authenticated user
   app.get("/api/calls", authenticateUser, async (req: any, res: any) => {
@@ -612,7 +654,7 @@ async function startServer() {
       }
     });
 
-    const connectGemini = async (systemPrompt: string, voiceId: string, isUpdate = false, contactId?: string, callTopic?: string) => {
+    const connectGemini = async (systemPrompt: string, voiceId: string, isUpdate = false, contactId?: string, callTopic?: string, personalityId?: string) => {
       if (isConnectingGemini) {
         console.log("Already establishing connection, ignoring request");
         return;
@@ -636,20 +678,26 @@ async function startServer() {
           throw new Error("GEMINI_API_KEY environment variable is required but missing");
         }
 
-        // 1. Retrieve the user's active personality & voice preference from user_preferences table
+        // 1. Retrieve voice preference
         const prefs = await getPreferences(decodedUser.uid);
         const resolvedVoice = voiceId || prefs?.default_voice || "Zephyr";
-        const resolvedPersonaId = prefs?.ai_personality || "friendly";
 
-        // 2. Set the appropriate system instruction in Gemini based on the active personality
-        const foundPersona = [
-          { id: "friendly", prompt: "You are an engaging phone partner. Keep your replies friendly, conversational, and concise. Ask questions to keep the flow alive!" },
-          { id: "interviewer", prompt: "You are a professional, slightly tough technical interviewer conducting a phone screen. Give concise, sharp questions and realistic feedback." },
-          { id: "tutor", prompt: "You are a helpful and supportive Spanish conversation teacher. Speak in a mix of slow Spanish and English. Correct my mistakes kindly." },
-          { id: "coach", prompt: "You are a peaceful, calm meditation guide. Walk me through rhythmic breathing exercises and offer short, soothing reflections." }
-        ].find(p => p.id === resolvedPersonaId);
-
-        const resolvedPrompt = foundPersona ? foundPersona.prompt : (systemPrompt || "You are an engaging phone partner. Keep your replies friendly, conversational, and concise. Ask questions to keep the flow alive!");
+        // 2. Build system instruction from saved Personality profile (if provided)
+        //    or fall back to a generic engaging assistant prompt.
+        let resolvedPrompt = systemPrompt || "You are an engaging phone partner. Keep your replies friendly, conversational, and concise. Ask questions to keep the flow alive!";
+        let resolvedPersonalityName = "";
+        if (personalityId) {
+          try {
+            const personalities = await listPersonalities(decodedUser.uid);
+            const found = personalities.find(p => p.id === personalityId);
+            if (found) {
+              resolvedPrompt = buildPersonalitySystemPrompt(found, callTopic);
+              resolvedPersonalityName = found.name;
+            }
+          } catch (err) {
+            console.error("Failed to load personality for call:", err);
+          }
+        }
 
         // 3. Resolve the contact for this call up front (auto-creates/reuses a Default
         // Contact if needed) so we can look up the last completed conversation with
@@ -877,8 +925,8 @@ async function startServer() {
         const { type, data } = envelope;
 
         if (type === "config") {
-          const { systemPrompt, voiceId, contactId, callTopic } = data || {};
-          await connectGemini(systemPrompt, voiceId, false, contactId, callTopic);
+          const { systemPrompt, voiceId, contactId, callTopic, personalityId } = data || {};
+          await connectGemini(systemPrompt, voiceId, false, contactId, callTopic, personalityId);
           return;
         }
 
