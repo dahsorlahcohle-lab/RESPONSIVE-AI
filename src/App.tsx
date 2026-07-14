@@ -1249,12 +1249,19 @@ export default function App() {
       ═══════════════════════════════════════════════════════════════════════ */}
       <header className="border-b border-white/5 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          {/* Left: spacer — keeps title centred */}
-          <div className="w-9 h-9" />
+          {/* Left: shield logo */}
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/logo.png"
+              alt="RESPONXIVE"
+              className="h-9 w-auto object-contain"
+              style={{ maxHeight: "36px" }}
+            />
+          </div>
 
-          {/* Center: AI Name */}
-          <div className="flex flex-col items-center">
-            <span className="font-bold text-white text-sm tracking-tight">RESPONSIVE AI</span>
+          {/* Center: Brand name */}
+          <div className="flex flex-col items-center absolute left-1/2 -translate-x-1/2">
+            <span className="font-bold text-white text-sm tracking-tight">RESPONXIVE</span>
             {callState === "active" && (
               <span className="text-[9px] text-emerald-400 font-mono uppercase tracking-widest animate-pulse">
                 Live · {formatLiveDuration(liveDurationSeconds)}
