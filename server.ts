@@ -33,6 +33,21 @@ import { createPersonality, listPersonalities, updatePersonality, deletePersonal
 
 dotenv.config();
 
+// File upload middleware + document parsers
+import multer from "multer";
+import * as pdfParse from "pdf-parse";
+import mammoth from "mammoth";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB cap
+  fileFilter: (_req: any, file: any, cb: any) => {
+    const allowed = [".pdf", ".txt", ".doc", ".docx"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, allowed.includes(ext));
+  }
+});
+
 // Helper to log administrative audit actions
 async function logAdminAction(adminUid: string, adminEmail: string, action: string, targetUid: string, targetEmail: string, details: string) {
   try {
@@ -48,6 +63,28 @@ async function startServer() {
   const wss = new WebSocketServer({ noServer: true });
 
   const PORT = 3000;
+
+  // Ensure the call-context Supabase Storage bucket exists (idempotent)
+  try {
+    const adminSB = getSupabaseAdmin();
+    const { data: buckets } = await adminSB.storage.listBuckets();
+    const exists = (buckets || []).some((b: any) => b.id === "call-context");
+    if (!exists) {
+      const { error } = await adminSB.storage.createBucket("call-context", {
+        public: false,
+        fileSizeLimit: 10 * 1024 * 1024
+      });
+      if (error) {
+        console.warn("[Storage] Failed to auto-create call-context bucket:", error.message);
+      } else {
+        console.log("[Storage] Created call-context bucket.");
+      }
+    } else {
+      console.log("[Storage] call-context bucket already exists.");
+    }
+  } catch (err: any) {
+    console.warn("[Storage] Bucket init skipped:", err.message);
+  }
 
   // Middleware for body-parsing
   app.use(express.json());
@@ -225,6 +262,66 @@ async function startServer() {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+  // ─── File Context Upload (used during live calls) ────────────────────────────
+  // Accepts PDF / TXT / DOC / DOCX, extracts plain text, stores in Supabase Storage,
+  // and returns a concise summary the client can inject as a live_directive into the
+  // active Gemini session so the AI can reference the document in real-time.
+  app.post(
+    "/api/calls/upload-context",
+    authenticateUser,
+    upload.single("file"),
+    async (req: any, res: any) => {
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: "No file uploaded or unsupported format" });
+      }
+
+      try {
+        let extractedText = "";
+        const ext = path.extname(req.file.originalname).toLowerCase();
+
+        if (ext === ".pdf") {
+          const parsed = await (pdfParse as any).default ? (pdfParse as any).default(req.file.buffer) : (pdfParse as any)(req.file.buffer);
+          extractedText = parsed.text;
+        } else if (ext === ".txt") {
+          extractedText = req.file.buffer.toString("utf-8");
+        } else if (ext === ".doc" || ext === ".docx") {
+          const result = await mammoth.extractRawText({ buffer: req.file.buffer });
+          extractedText = result.value;
+        }
+
+        // Trim to first ~4000 chars to stay well inside Gemini's context window
+        const trimmed = extractedText.replace(/\s+/g, " ").trim().slice(0, 4000);
+
+        // Store raw text in Supabase Storage under the user's path
+        const supabase = getSupabaseAdmin();
+        const storagePath = `${req.user.uid}/call-context/${Date.now()}-${req.file.originalname}`;
+        await supabase.storage
+          .from("call-context")
+          .upload(storagePath, req.file.buffer, {
+            contentType: req.file.mimetype,
+            upsert: true
+          });
+
+        // Build a short summary the AI can act on immediately
+        const summary = trimmed.length > 600
+          ? trimmed.slice(0, 600) + "… [document continues]"
+          : trimmed;
+
+        res.json({
+          success: true,
+          filename: req.file.originalname,
+          characters: trimmed.length,
+          summary,
+          storagePath
+        });
+      } catch (err: any) {
+        console.error("File context upload error:", err);
+        res.status(500).json({ success: false, error: err.message || "Failed to process document" });
+      }
+    }
+  );
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // ─── Personality CRUD Routes ─────────────────────────────────────────────────
   app.get("/api/personalities", authenticateUser, async (req: any, res: any) => {
