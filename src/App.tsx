@@ -1241,6 +1241,7 @@ export default function App() {
           setControlCenterTab("settings");
           setShowThreeDotMenuModal(true);
         }}
+        onOpenProfile={() => { setShowSidebarPanel(false); setShowProfileModal(true); }}
       />
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -1248,14 +1249,8 @@ export default function App() {
       ═══════════════════════════════════════════════════════════════════════ */}
       <header className="border-b border-white/5 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          {/* Left: hamburger → Profile */}
-          <button
-            onClick={() => setShowProfileModal(true)}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all"
-            title="Profile"
-          >
-            <User className="w-5 h-5" />
-          </button>
+          {/* Left: spacer — keeps title centred */}
+          <div className="w-9 h-9" />
 
           {/* Center: AI Name */}
           <div className="flex flex-col items-center">
@@ -1296,18 +1291,7 @@ export default function App() {
             >
               {/* AI Core Chat Feed */}
               <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
-                {/* AI Personal Core card pinned at top */}
-                <div className="flex gap-3 items-start">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
-                    <Sparkles className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="bg-slate-900/60 border border-white/5 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-300 max-w-xs leading-relaxed">
-                    {selectedPersonalityForCall
-                      ? <>I'm <span className="text-indigo-300 font-semibold">{selectedPersonalityForCall.name}</span> — {selectedPersonalityForCall.role}. Ready when you are.</>
-                      : <>Hi! I'm your <span className="text-indigo-300 font-semibold">AI Assistant</span>. Open the menu to choose a personality, then start a call.</>
-                    }
-                  </div>
-                </div>
+
 
                 {/* Chat history from previous calls */}
                 {chatHistory.map(turn => (
@@ -1332,6 +1316,58 @@ export default function App() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* ── AI CORE — pinned above typing bar ── */}
+              <div className="px-4 pt-3 pb-2 shrink-0">
+                <div className="bg-slate-900/70 border border-indigo-500/15 rounded-2xl px-4 py-4 flex flex-col gap-3 shadow-lg shadow-indigo-500/5">
+
+                  {/* Status row */}
+                  <div className="flex items-center gap-3">
+                    <div className="relative shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                        <Sparkles className="w-5 h-5 text-white" />
+                      </div>
+                      {/* live pulse dot */}
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-950" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white leading-tight truncate">
+                        {selectedPersonalityForCall ? selectedPersonalityForCall.name : "AI Core"}
+                      </p>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        {selectedPersonalityForCall ? selectedPersonalityForCall.role : "Ready — select a personality from the sidebar"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowSidebarPanel(true)}
+                      className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-2.5 py-1.5 rounded-lg transition-all"
+                    >
+                      {selectedPersonalityForCall ? "Change" : "Choose"}
+                    </button>
+                  </div>
+
+                  {/* Personality attributes row (only when one is selected) */}
+                  {selectedPersonalityForCall && (selectedPersonalityForCall.communication_style || selectedPersonalityForCall.knowledge_area || selectedPersonalityForCall.behavior_pattern) && (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedPersonalityForCall.communication_style && (
+                        <span className="text-[9px] bg-white/5 border border-white/5 rounded-md px-2 py-0.5 text-slate-400 truncate max-w-[120px]">
+                          {selectedPersonalityForCall.communication_style}
+                        </span>
+                      )}
+                      {selectedPersonalityForCall.knowledge_area && (
+                        <span className="text-[9px] bg-white/5 border border-white/5 rounded-md px-2 py-0.5 text-slate-400 truncate max-w-[120px]">
+                          {selectedPersonalityForCall.knowledge_area}
+                        </span>
+                      )}
+                      {selectedPersonalityForCall.behavior_pattern && (
+                        <span className="text-[9px] bg-white/5 border border-white/5 rounded-md px-2 py-0.5 text-slate-400 truncate max-w-[120px]">
+                          {selectedPersonalityForCall.behavior_pattern}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Bottom Typing Bar + Call trigger */}
