@@ -217,7 +217,7 @@ export default function SidebarPanel({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 280 }}
-            className="fixed top-0 right-0 h-full w-80 max-w-[90vw] bg-slate-950/98 border-l border-white/8 z-[90] flex flex-col shadow-2xl"
+            className="fixed top-0 right-0 h-full w-80 sm:w-96 lg:w-[420px] max-w-[92vw] bg-slate-950/98 border-l border-white/8 z-[90] flex flex-col shadow-2xl safe-top safe-bottom"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-4 border-b border-white/5 shrink-0">

@@ -1063,7 +1063,7 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center font-sans">
+      <div className="min-h-[100dvh] bg-slate-950 flex flex-col justify-center items-center font-sans">
         <div className="flex flex-col items-center gap-3">
           <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" />
           <p className="text-xs text-slate-500 font-mono">Syncing secure credentials with Node...</p>
@@ -1098,7 +1098,7 @@ export default function App() {
   // Secure Admin Access Check: Access Denied Page
   if (currentRoute === "admin" && userRole !== "admin") {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 relative font-sans text-slate-100">
+      <div className="min-h-[100dvh] bg-slate-950 flex flex-col justify-center items-center p-4 relative font-sans text-slate-100">
         <div className="absolute top-0 left-1/3 w-[600px] h-[600px] bg-red-600/5 rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-indigo-600/5 rounded-full blur-[120px] pointer-events-none" />
         
@@ -1138,7 +1138,7 @@ export default function App() {
   // Secure Admin Access Check: Full-screen Admin Console for Authorized Admins
   if (currentRoute === "admin" && userRole === "admin") {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col font-sans p-4 sm:p-6 md:p-8 relative">
+      <div className="min-h-[100dvh] bg-slate-950 flex flex-col font-sans p-4 sm:p-6 md:p-8 relative">
         <div className="absolute top-0 left-1/3 w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-[140px] pointer-events-none" />
         <div className="max-w-6xl w-full mx-auto flex-1 flex flex-col z-10">
           <div className="mb-4 flex items-center justify-between">
@@ -1167,7 +1167,7 @@ export default function App() {
   const activePersonalityName = selectedPersonalityForCall?.name || "AI Assistant";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200 relative overflow-x-hidden">
+    <div className="min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200 relative overflow-x-hidden">
 
       {/* Ambient lighting */}
       <div className="absolute top-0 left-1/3 w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-[140px] pointer-events-none" />
@@ -1248,8 +1248,8 @@ export default function App() {
       {/* ═══════════════════════════════════════════════════════════════════════
           HEADER
       ═══════════════════════════════════════════════════════════════════════ */}
-      <header className="border-b border-white/5 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+      <header className="border-b border-white/5 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30 safe-top">
+        <div className="max-w-md sm:max-w-2xl lg:max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
           {/* Left: shield logo */}
           <div className="flex items-center gap-2.5">
             <img
@@ -1284,7 +1284,7 @@ export default function App() {
       {/* ═══════════════════════════════════════════════════════════════════════
           MAIN — switches between HOME and LIVE CALL
       ═══════════════════════════════════════════════════════════════════════ */}
-      <main className="flex-1 flex flex-col max-w-2xl w-full mx-auto relative z-10">
+      <main className="flex-1 flex flex-col max-w-md sm:max-w-2xl lg:max-w-4xl w-full mx-auto relative z-10 px-0 lg:px-4">
         <AnimatePresence mode="wait">
 
           {/* ── HOME SCREEN ── */}
@@ -1378,17 +1378,24 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Bottom Typing Bar + Call trigger */}
-              <div className="px-4 py-3 border-t border-white/5 bg-slate-950/80 backdrop-blur-md flex gap-2 items-end shrink-0">
-                <div className="flex-1 bg-slate-900/60 border border-white/8 rounded-2xl flex items-end gap-2 px-3 py-2.5 min-h-[44px]">
+              {/* Bottom Instruction Bar + Call trigger */}
+              <div className="px-4 py-3 border-t border-white/5 bg-slate-950/80 backdrop-blur-md flex gap-2 items-end shrink-0 safe-bottom"
+                style={{ paddingBottom: "max(env(safe-area-inset-bottom), 12px)" }}
+              >
+                <div className="flex-1 bg-slate-900/60 border border-indigo-500/15 rounded-2xl flex items-center gap-2 px-3 min-h-[48px] focus-within:border-indigo-500/40 transition-colors">
+                  <Terminal className="w-4 h-4 text-indigo-500/50 shrink-0" />
                   <textarea
                     value={chatInput}
                     onChange={(e) => { setChatInput(e.target.value); setCallTopic(e.target.value); }}
+                    onFocus={(e) => {
+                      e.target.style.transform = 'none';
+                      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                    }}
                     onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) { sendLiveDirective(chatInput); setChatInput(""); } } }}
-                    placeholder={selectedPersonalityForCall ? `Send a directive to ${selectedPersonalityForCall.name}…` : "Type a command or directive…"}
+                    placeholder={selectedPersonalityForCall ? `Instruct ${selectedPersonalityForCall.name}…` : "Type an instruction for the AI…"}
                     rows={1}
-                    className="flex-1 bg-transparent text-sm text-white placeholder-slate-600 resize-none focus:outline-none leading-relaxed"
-                    style={{ maxHeight: "100px" }}
+                    className="flex-1 bg-transparent text-base text-white placeholder-slate-600 resize-none focus:outline-none leading-relaxed py-3"
+                    style={{ maxHeight: "120px" }}
                   />
                   {chatInput.trim() && (
                     <button onClick={() => { sendLiveDirective(chatInput); setChatInput(""); }} className="text-indigo-400 hover:text-indigo-300 transition-all shrink-0">
@@ -1400,10 +1407,10 @@ export default function App() {
                 <button
                   onClick={() => handlePlaceCall(null, selectedPersonalityForCall || undefined)}
                   disabled={callState === "connecting" || callState === "ringing"}
-                  className="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 flex items-center justify-center transition-all shadow-lg shadow-indigo-500/20 shrink-0"
+                  className="w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 flex items-center justify-center transition-all shadow-lg shadow-indigo-500/20 shrink-0"
                   title="Start Call"
                 >
-                  <Phone className="w-4.5 h-4.5 text-white" />
+                  <Phone className="w-5 h-5 text-white" />
                 </button>
               </div>
             </motion.div>
@@ -1520,21 +1527,25 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Typing bar during call */}
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1 bg-slate-900/60 border border-white/8 rounded-2xl flex items-end gap-2 px-3 py-2.5 min-h-[40px]">
+                {/* Instruction bar during call */}
+                <div className="flex gap-2 items-end safe-bottom" style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0px)" }}>
+                  <div className="flex-1 bg-slate-900/60 border border-indigo-500/15 rounded-2xl flex items-center gap-2 px-3 min-h-[44px] focus-within:border-indigo-500/40 transition-colors">
+                    <Terminal className="w-3.5 h-3.5 text-indigo-500/50 shrink-0" />
                     <textarea
                       value={chatInput}
                       onChange={e => setChatInput(e.target.value)}
+                      onFocus={(e) => {
+                        setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                      }}
                       onKeyDown={e => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
                           if (chatInput.trim()) { sendLiveDirective(chatInput); setChatInput(""); }
                         }
                       }}
-                      placeholder="Send a live directive to the AI…"
+                      placeholder="Instruct the AI…"
                       rows={1}
-                      className="flex-1 bg-transparent text-xs text-white placeholder-slate-600 resize-none focus:outline-none"
+                      className="flex-1 bg-transparent text-base text-white placeholder-slate-600 resize-none focus:outline-none leading-relaxed py-2.5"
                       style={{ maxHeight: "80px" }}
                     />
                   </div>
