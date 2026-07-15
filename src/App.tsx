@@ -504,7 +504,10 @@ export default function App() {
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   
   // Dialog Conversation Logs
-  const [chatHistory, setChatHistory] = useState<ChatTurn[]>([]);
+  const [chatHistoryByPersonality, setChatHistoryByPersonality] = useState<Record<string, ChatTurn[]>>({});
+  const chatHistory = selectedPersonalityForCall
+    ? (chatHistoryByPersonality[selectedPersonalityForCall.id] || [])
+    : [];
   const [currentAiText, setCurrentAiText] = useState("");
   
   // Developer Packet Logs
@@ -515,6 +518,7 @@ export default function App() {
   // WebSocket reference
   const wsRef = useRef<WebSocket | null>(null);
   const activePromptRef = useRef(systemPrompt);
+  const activePersonalityRef = useRef<string | null>(null);
 
   // Instantiating our sequential 24kHz Audio Playback hook
   const { playChunk, stopPlayback, isPlaying } = useAudioPlayback();
@@ -758,7 +762,10 @@ export default function App() {
     setCallState("connecting");
     setConnectionStatus("connecting");
     setIsSwappingVoice(false);
-    setChatHistory([]);
+    activePersonalityRef.current = personalityId || null;
+    if (personalityId) {
+        setChatHistoryByPersonality(prev => ({ ...prev, [personalityId]: [] }));
+      }
     setCurrentAiText("");
     addLog("system", "ws_connecting", "Placing voice call to Gemini Live Node...");
 
@@ -777,9 +784,12 @@ export default function App() {
         
         // Dispatch call setup and instructions envelope
         const targetContactId = overrideContactId !== undefined ? overrideContactId : selectedContactId;
+        const personalityVoiceId = personalityId
+          ? (personalities.find(p => p.id === personalityId)?.voice_id || selectedVoice)
+          : selectedVoice;
         const setupPayload = {
           systemPrompt: activePromptRef.current,
-          voiceId: selectedVoice,
+          voiceId: personalityVoiceId,
           contactId: targetContactId,
           callTopic: activeTopicRef.current,
           personalityId: personalityId || undefined,
@@ -934,15 +944,16 @@ export default function App() {
   // Commit text speech logs to dialog history when AI finishes speaking
   useEffect(() => {
     if (!isPlaying && currentAiText) {
-      setChatHistory((prev) => [
-        ...prev,
-        {
-          id: Math.random().toString(),
-          sender: "assistant",
-          text: currentAiText,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        }
-      ]);
+      const turn: ChatTurn = {
+        id: Math.random().toString(),
+        sender: "assistant",
+        text: currentAiText,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      const pid = activePersonalityRef.current;
+      if (pid) {
+        setChatHistoryByPersonality(prev => ({ ...prev, [pid]: [...(prev[pid] || []), turn] }));
+      }
       setCurrentAiText("");
     }
   }, [isPlaying, currentAiText]);
@@ -972,6 +983,7 @@ export default function App() {
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
+    activePersonalityRef.current = null;
     }
     stopPlayback();
     setActiveCallSessionId(null);

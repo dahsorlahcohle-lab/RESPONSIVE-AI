@@ -334,10 +334,10 @@ async function startServer() {
   });
 
   app.post("/api/personalities", authenticateUser, async (req: any, res: any) => {
-    const { name, role, communication_style, knowledge_area, behavior_pattern } = req.body;
+    const { name, role, communication_style, knowledge_area, behavior_pattern, voice_id } = req.body;
     if (!name || !role) return res.status(400).json({ success: false, error: "name and role are required" });
     try {
-      const p = await createPersonality(req.user.uid, name, role, communication_style || "", knowledge_area || "", behavior_pattern || "");
+      const p = await createPersonality(req.user.uid, name, role, communication_style || "", knowledge_area || "", behavior_pattern || "", voice_id || "Zephyr");
       res.json({ success: true, personality: p });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -345,9 +345,9 @@ async function startServer() {
   });
 
   app.put("/api/personalities/:id", authenticateUser, async (req: any, res: any) => {
-    const { name, role, communication_style, knowledge_area, behavior_pattern } = req.body;
+    const { name, role, communication_style, knowledge_area, behavior_pattern, voice_id } = req.body;
     try {
-      const p = await updatePersonality(req.params.id, req.user.uid, { name, role, communication_style, knowledge_area, behavior_pattern });
+      const p = await updatePersonality(req.params.id, req.user.uid, { name, role, communication_style, knowledge_area, behavior_pattern, voice_id });
       res.json({ success: true, personality: p });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -377,11 +377,11 @@ async function startServer() {
 
   // Start/Create a new call session
   app.post("/api/calls", authenticateUser, async (req: any, res: any) => {
-    const { contactId, selectedVoice } = req.body;
+    const { contactId, selectedVoice, personalityId, personalityName } = req.body;
     try {
       const resolvedContactId = await resolveContactId(req.user.uid, contactId);
 
-      const session = await createCallSession(req.user.uid, resolvedContactId, selectedVoice || "Zephyr");
+      const session = await createCallSession(req.user.uid, resolvedContactId, selectedVoice || "Zephyr", personalityId, personalityName);
       res.json({ success: true, session, contactId: resolvedContactId });
     } catch (err: any) {
       console.error("Error creating call session:", err);
@@ -777,7 +777,7 @@ async function startServer() {
 
         // 1. Retrieve voice preference
         const prefs = await getPreferences(decodedUser.uid);
-        const resolvedVoice = voiceId || prefs?.default_voice || "Zephyr";
+        let resolvedVoice = voiceId || prefs?.default_voice || "Zephyr";
 
         // 2. Build system instruction from saved Personality profile (if provided)
         //    or fall back to a generic engaging assistant prompt.
@@ -790,6 +790,10 @@ async function startServer() {
             if (found) {
               resolvedPrompt = buildPersonalitySystemPrompt(found, callTopic);
               resolvedPersonalityName = found.name;
+              // Use the personality's own voice, overriding the global default
+              if (found.voice_id) {
+                resolvedVoice = found.voice_id;
+              }
             }
           } catch (err) {
             console.error("Failed to load personality for call:", err);

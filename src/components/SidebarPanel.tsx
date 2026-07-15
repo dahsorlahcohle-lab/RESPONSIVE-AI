@@ -25,6 +25,7 @@ export interface Personality {
   communication_style: string;
   knowledge_area: string;
   behavior_pattern: string;
+  voice_id: string;
   created_at: string;
 }
 
@@ -73,14 +74,16 @@ interface PersonalityFormProps {
   onSave: (data: Omit<Personality, "id" | "created_at">) => void;
   onCancel: () => void;
   isSaving: boolean;
+  voices: VoiceOption[];
 }
-function PersonalityForm({ initial, onSave, onCancel, isSaving }: PersonalityFormProps) {
+function PersonalityForm({ initial, onSave, onCancel, isSaving, voices }: PersonalityFormProps) {
   const [form, setForm] = useState({
     name: initial?.name || "",
     role: initial?.role || "",
     communication_style: initial?.communication_style || "",
     knowledge_area: initial?.knowledge_area || "",
-    behavior_pattern: initial?.behavior_pattern || ""
+    behavior_pattern: initial?.behavior_pattern || "",
+    voice_id: initial?.voice_id || "Zephyr"
   });
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
@@ -107,6 +110,30 @@ function PersonalityForm({ initial, onSave, onCancel, isSaving }: PersonalityFor
           />
         </div>
       ))}
+      {/* Voice picker */}
+      <div className="flex flex-col gap-1">
+        <label className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Voice</label>
+        <select
+          value={form.voice_id}
+          onChange={(e) => setForm(f => ({ ...f, voice_id: e.target.value }))}
+          className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500/50 w-full"
+        >
+          {voices.map(v => (
+            <option key={v.id} value={v.id} className="bg-slate-900 text-white">
+              {v.name} — {v.actor} ({v.gender})
+            </option>
+          ))}
+        </select>
+        {(() => {
+          const sel = voices.find(v => v.id === form.voice_id);
+          if (!sel) return null;
+          return (
+            <p className="text-[9px] text-slate-500 leading-relaxed mt-0.5">
+              <span className="text-slate-400">{sel.style}</span> — {sel.description}
+            </p>
+          );
+        })()}
+      </div>
       <div className="flex gap-2 pt-1">
         <button
           onClick={() => onSave(form)}
@@ -300,6 +327,7 @@ export default function SidebarPanel({
                       onSave={handleSave}
                       onCancel={() => setShowForm(false)}
                       isSaving={isSaving}
+                      voices={voices}
                     />
                   )}
 
@@ -318,6 +346,7 @@ export default function SidebarPanel({
                           onSave={handleSave}
                           onCancel={() => setEditingId(null)}
                           isSaving={isSaving}
+                          voices={voices}
                         />
                       ) : (
                         <div className="bg-white/3 border border-white/5 rounded-2xl p-3 flex flex-col gap-2">
@@ -355,6 +384,12 @@ export default function SidebarPanel({
                                 <span className="text-slate-400 truncate">{val}</span>
                               </div>
                             ) : null)}
+                            {p.voice_id && (
+                              <div className="flex gap-1.5 text-[9px]">
+                                <span className="text-slate-600 uppercase tracking-wider font-semibold shrink-0 w-14">Voice</span>
+                                <span className="text-indigo-400 truncate">{voices.find(v => v.id === p.voice_id)?.name || p.voice_id}</span>
+                              </div>
+                            )}
                           </div>
                           <button
                             onClick={() => { onStartCall(p); onClose(); }}

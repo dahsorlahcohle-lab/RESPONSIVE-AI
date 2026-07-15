@@ -186,6 +186,8 @@ export interface CallSession {
   id: string;
   user_id: string;
   contact_id?: string;
+  personality_id?: string;
+  personality_name?: string;
   selected_voice: string;
   status: "active" | "completed" | "failed";
   duration_seconds: number;
@@ -197,10 +199,12 @@ export interface CallSession {
   contact_company?: string;
 }
 
-export async function createCallSession(userId: string, contactId: string | null, selectedVoice: string): Promise<CallSession> {
+export async function createCallSession(userId: string, contactId: string | null, selectedVoice: string, personalityId?: string, personalityName?: string): Promise<CallSession> {
   const newSession = {
     user_id: userId,
     contact_id: contactId || undefined,
+    personality_id: personalityId || undefined,
+    personality_name: personalityName || undefined,
     selected_voice: selectedVoice,
     status: "active" as const,
     duration_seconds: 0,
@@ -714,6 +718,7 @@ export interface Personality {
   communication_style: string;
   knowledge_area: string;
   behavior_pattern: string;
+  voice_id: string;
   created_at: string;
 }
 
@@ -723,7 +728,8 @@ export async function createPersonality(
   role: string,
   communicationStyle: string,
   knowledgeArea: string,
-  behaviorPattern: string
+  behaviorPattern: string,
+  voiceId: string = "Zephyr"
 ): Promise<Personality> {
   const record = {
     user_id: userId,
@@ -732,6 +738,7 @@ export async function createPersonality(
     communication_style: communicationStyle,
     knowledge_area: knowledgeArea,
     behavior_pattern: behaviorPattern,
+    voice_id: voiceId,
     created_at: new Date().toISOString()
   };
   return runWithFallback<Personality>(
