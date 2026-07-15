@@ -177,6 +177,7 @@ export default function SidebarPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showAllCalls, setShowAllCalls] = useState(false);
 
   const handleSave = useCallback(async (data: Omit<Personality, "id" | "created_at">) => {
     setIsSaving(true);
@@ -411,15 +412,41 @@ export default function SidebarPanel({
               {/* ── RECENT TAB ── */}
               {activeTab === "recent" && (
                 <div className="flex flex-col gap-2">
+                  {selectedPersonalityId && (
+                    <div className="flex gap-1 p-0.5 bg-white/3 rounded-lg border border-white/5">
+                      <button
+                        onClick={() => setShowAllCalls(false)}
+                        className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all ${
+                          !showAllCalls
+                            ? "bg-indigo-600 text-white"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {personalities.find(p => p.id === selectedPersonalityId)?.name || "Personality"}
+                      </button>
+                      <button
+                        onClick={() => setShowAllCalls(true)}
+                        className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all ${
+                          showAllCalls
+                            ? "bg-indigo-600 text-white"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        All
+                      </button>
+                    </div>
+                  )}
                   <p className="text-[9px] text-slate-500 uppercase tracking-widest font-semibold px-1">
-                    Recent Calls{selectedPersonalityId ? " — " + (personalities.find(p => p.id === selectedPersonalityId)?.name || "") : ""}
+                    {selectedPersonalityId && !showAllCalls
+                      ? "Calls — " + (personalities.find(p => p.id === selectedPersonalityId)?.name || "")
+                      : "All Recent Calls"}
                   </p>
                   {(() => {
-                    const filtered = selectedPersonalityId
+                    const filtered = (selectedPersonalityId && !showAllCalls)
                       ? recentCalls.filter(c => c.personality_id === selectedPersonalityId)
                       : recentCalls;
                     if (filtered.length === 0) {
-                      return <div className="text-center py-8 text-slate-600 text-xs">No calls{selectedPersonalityId ? " with this personality" : ""} yet.</div>;
+                      return <div className="text-center py-8 text-slate-600 text-xs">No calls{(selectedPersonalityId && !showAllCalls) ? " with this personality" : ""} yet.</div>;
                     }
                     return filtered.map(c => (
                       <div key={c.id} className="flex items-center gap-3 p-3 bg-white/3 border border-white/5 rounded-xl">
