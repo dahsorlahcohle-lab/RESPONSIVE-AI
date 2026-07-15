@@ -1578,6 +1578,21 @@ export default function App() {
         </AnimatePresence>
       </main>
 
+      {/* Footer — only on idle screen */}
+      {callState === "idle" && (
+        <footer
+          className="shrink-0 mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 flex items-center justify-between text-[9px] text-slate-600 border-t border-white/5"
+          style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)", paddingTop: "8px" }}
+        >
+          <span className="font-bold tracking-widest uppercase">RESPONXIVE</span>
+          <span className="flex items-center gap-1">
+            <span className={`w-1.5 h-1.5 rounded-full ${connectionStatus === "connected" ? "bg-emerald-500" : "bg-slate-600"} animate-pulse`} />
+            {connectionStatus === "connected" ? "System Active" : "Standby"}
+          </span>
+          <span className="tracking-wider">v1.0</span>
+        </footer>
+      )}
+
       {/* Discreet admin access */}
       <button
         onClick={() => navigateTo("admin")}
