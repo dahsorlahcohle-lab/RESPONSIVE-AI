@@ -31,6 +31,7 @@ export interface Personality {
 
 interface RecentCall {
   id: string;
+  personality_id?: string;
   personality_name: string;
   created_at: string;
   duration_seconds: number;
@@ -44,6 +45,7 @@ interface SidebarPanelProps {
   onVoiceSelect: (voiceId: string) => void;
   personalities: Personality[];
   recentCalls: RecentCall[];
+  selectedPersonalityId: string | null;
   authToken: string;
   onPersonalitiesChange: (list: Personality[]) => void;
   onStartCall: (personality: Personality) => void;
@@ -163,6 +165,7 @@ export default function SidebarPanel({
   onVoiceSelect,
   personalities,
   recentCalls,
+  selectedPersonalityId,
   authToken,
   onPersonalitiesChange,
   onStartCall,
@@ -408,21 +411,28 @@ export default function SidebarPanel({
               {/* ── RECENT TAB ── */}
               {activeTab === "recent" && (
                 <div className="flex flex-col gap-2">
-                  <p className="text-[9px] text-slate-500 uppercase tracking-widest font-semibold px-1">Recent Calls</p>
-                  {recentCalls.length === 0 && (
-                    <div className="text-center py-8 text-slate-600 text-xs">No calls yet.</div>
-                  )}
-                  {recentCalls.map(c => (
-                    <div key={c.id} className="flex items-center gap-3 p-3 bg-white/3 border border-white/5 rounded-xl">
-                      <div className="w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                        <Phone className="w-3.5 h-3.5 text-indigo-400" />
+                  <p className="text-[9px] text-slate-500 uppercase tracking-widest font-semibold px-1">
+                    Recent Calls{selectedPersonalityId ? " — " + (personalities.find(p => p.id === selectedPersonalityId)?.name || "") : ""}
+                  </p>
+                  {(() => {
+                    const filtered = selectedPersonalityId
+                      ? recentCalls.filter(c => c.personality_id === selectedPersonalityId)
+                      : recentCalls;
+                    if (filtered.length === 0) {
+                      return <div className="text-center py-8 text-slate-600 text-xs">No calls{selectedPersonalityId ? " with this personality" : ""} yet.</div>;
+                    }
+                    return filtered.map(c => (
+                      <div key={c.id} className="flex items-center gap-3 p-3 bg-white/3 border border-white/5 rounded-xl">
+                        <div className="w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                          <Phone className="w-3.5 h-3.5 text-indigo-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-white truncate">{c.personality_name || "AI Assistant"}</p>
+                          <p className="text-[9px] text-slate-500">{timeAgo(c.created_at)} · {fmtDuration(c.duration_seconds || 0)}</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-white truncate">{c.personality_name || "AI Assistant"}</p>
-                        <p className="text-[9px] text-slate-500">{timeAgo(c.created_at)} · {fmtDuration(c.duration_seconds || 0)}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               )}
             </div>

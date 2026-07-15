@@ -1240,10 +1240,12 @@ export default function App() {
         personalities={personalities}
         recentCalls={calls.map(c => ({
           id: c.id,
+          personality_id: c.personality_id,
           personality_name: c.personality_name || c.contact_name || "AI Assistant",
           created_at: c.created_at,
           duration_seconds: c.duration_seconds || 0
         }))}
+        selectedPersonalityId={selectedPersonalityForCall?.id || null}
         authToken={authToken}
         onPersonalitiesChange={setPersonalities}
         onStartCall={(personality) => {
