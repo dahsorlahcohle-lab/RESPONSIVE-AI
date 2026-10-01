@@ -1106,8 +1106,8 @@ export default function App() {
             contacts={contacts}
             selectedContactId={selectedContactId}
             onSelectContact={setSelectedContactId}
-            onCreateContact={async () => {}}
-            onDeleteContact={async () => {}}
+            onCreateContact={handleCreateContact}
+            onDeleteContact={handleDeleteContact}
             calls={calls}
             authToken={authToken}
             user={user}
