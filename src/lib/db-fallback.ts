@@ -94,6 +94,18 @@ export async function listContacts(userId: string): Promise<Contact[]> {
 // auto-creating (and reusing) a single "Default Contact" if the user has none yet,
 // or falling back to their first contact if an unknown/stale ID was passed in.
 // Centralizes logic that used to be duplicated across the WS handler and REST route.
+export async function deleteContact(userId: string, contactId: string): Promise<void> {
+  return runSupabaseOnly(async () => {
+      const supabase = getSupabaseAdmin();
+      const { error } = await supabase
+        .from("contacts")
+        .delete()
+        .eq("id", contactId)
+        .eq("user_id", userId);
+      return { data: undefined, error };
+    }, "deleteContact");
+}
+
 export async function resolveContactId(userId: string, requestedContactId?: string | null): Promise<string> {
   const contactsList = await listContacts(userId);
 

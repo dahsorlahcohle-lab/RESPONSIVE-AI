@@ -30,6 +30,7 @@ import {
   resolveContactId
 } from "./src/lib/db-fallback";
 import { createPersonality, listPersonalities, updatePersonality, deletePersonality, buildPersonalitySystemPrompt, type Personality } from "./src/lib/db-fallback";
+import { deleteContact } from "./src/lib/db-fallback";
 
 dotenv.config();
 
@@ -215,6 +216,17 @@ const OWNER_EMAIL = "dahsorlahcohle@gmail.com";
       res.json({ success: true, contact });
     } catch (err: any) {
       console.error("Error creating contact:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Delete a contact
+  app.delete("/api/contacts/:id", authenticateUser, async (req: any, res: any) => {
+    try {
+      await deleteContact(req.user.uid, req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Error deleting contact:", err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
