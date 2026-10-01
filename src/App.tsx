@@ -32,8 +32,6 @@ import {
   MoreVertical
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { getSupabase } from "./lib/supabase";
-import AuthScreen from "./components/AuthScreen";
 import UserProfileModal from "./components/UserProfileModal";
 import AdminConsole from "./components/AdminConsole";
 import CallHistoryDrawer from "./components/CallHistoryDrawer";
@@ -403,6 +401,10 @@ export const VOICES: VoiceOption[] = [
   }
 ];
 
+// Fixed owner account (single-user app, no login screen)
+const OWNER_UID = "a357b679-767d-48df-9316-c75a4616061b";
+const OWNER_EMAIL = "dahsorlahcohle@gmail.com";
+
 export default function App() {
   // Authentication & Profile States
   const [user, setUser] = useState<any>(null);
@@ -523,64 +525,16 @@ export default function App() {
   // Instantiating our sequential 24kHz Audio Playback hook
   const { playChunk, stopPlayback, isPlaying } = useAudioPlayback();
 
-  // Listen to Supabase Authentication State Changes
+  // ─── Single-owner boot (no login gate) ──────────────────────────────
+  // The app opens straight into the workspace as the fixed owner account.
+  // The server resolves the same owner for every request, so the auth token
+  // is just a marker the API headers carry along.
   useEffect(() => {
-    const supabase = getSupabase();
-
-    const handleSession = async (session: any) => {
-      if (session) {
-        const currentUser = session.user;
-        const mappedUser = {
-          uid: currentUser.id,
-          email: currentUser.email,
-          displayName: currentUser.user_metadata?.displayName || currentUser.user_metadata?.full_name || currentUser.email?.split("@")[0] || "User"
-        };
-        setUser(mappedUser);
-
-        const token = session.access_token;
-        if (token) {
-          setAuthToken(token);
-          
-          try {
-            // Sync profile with database on backend server securely
-            const response = await fetch("/api/auth/register-profile", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-              }
-            });
-            const data = await response.json();
-            if (data.success) {
-              setUserRole(data.role || "user");
-              setUserStatus(data.status || "active");
-            }
-          } catch (err) {
-            console.error("Failed to register/sync profile on server:", err);
-          }
-        }
-      } else {
-        setUser(null);
-        setUserRole("user");
-        setUserStatus("active");
-        setAuthToken("");
-      }
-      setAuthLoading(false);
-    };
-
-    // Initialize session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      handleSession(session);
-    });
-
-    // Listen to changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      handleSession(session);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    setUser({ uid: OWNER_UID, email: OWNER_EMAIL, displayName: "Dahsorlah" });
+    setUserRole("admin");
+    setUserStatus("active");
+    setAuthToken("local-owner");
+    setAuthLoading(false);
   }, []);
 
   // Fetch calls and contacts
@@ -770,7 +724,7 @@ export default function App() {
     addLog("system", "ws_connecting", "Placing voice call to Gemini Live Node...");
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    // Append the Firebase Auth Id Token to securely authorize the WebSocket Upgrade
+    // Single-owner mode: the server resolves the owner account; token is a marker only
     const wsUrl = `${protocol}//${window.location.host}/api/ws?token=${authToken}`;
 
     try {
@@ -1084,69 +1038,6 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="relative">
-        {currentRoute === "admin" && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
-            <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 shadow-xl backdrop-blur-md">
-              <Lock className="w-4 h-4 text-indigo-400 shrink-0" />
-              <span>
-                <strong>Admin Portal:</strong> Please sign in with an authorized Administrator account to continue.
-              </span>
-            </div>
-          </div>
-        )}
-        <AuthScreen 
-          onSuccess={(token, loggedUser) => {
-            setAuthToken(token);
-            setUser(loggedUser);
-          }} 
-        />
-      </div>
-    );
-  }
-
-  // Secure Admin Access Check: Access Denied Page
-  if (currentRoute === "admin" && userRole !== "admin") {
-    return (
-      <div className="min-h-[100dvh] bg-slate-950 flex flex-col justify-center items-center p-4 relative font-sans text-slate-100">
-        <div className="absolute top-0 left-1/3 w-[600px] h-[600px] bg-red-600/5 rounded-full blur-[140px] pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-indigo-600/5 rounded-full blur-[120px] pointer-events-none" />
-        
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md bg-slate-900/40 backdrop-blur-xl border border-red-500/20 rounded-3xl p-8 shadow-2xl relative text-center"
-        >
-          <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 text-red-400">
-            <ShieldCheck className="w-8 h-8" />
-          </div>
-          <h2 className="text-xl font-black text-white tracking-tight mb-2">Access Denied</h2>
-          <p className="text-xs text-slate-400 leading-relaxed mb-6">
-            Your account <span className="text-slate-200 font-mono font-bold">{user?.email}</span> does not have Administrator privileges. Please sign in with an authorized administrator account or return to the main dashboard.
-          </p>
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => navigateTo("home")}
-              className="w-full bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-bold py-3 px-6 rounded-xl text-xs hover:from-indigo-500 hover:to-violet-400 transition-all cursor-pointer shadow-lg shadow-indigo-500/10"
-            >
-              Go to Home Screen
-            </button>
-            <button
-              onClick={async () => {
-                await getSupabase().auth.signOut();
-              }}
-              className="w-full bg-white/5 border border-white/10 text-slate-400 hover:text-white font-bold py-3 px-6 rounded-xl text-xs hover:bg-white/10 transition-all cursor-pointer"
-            >
-              Sign Out & Switch Account
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
   // Secure Admin Access Check: Full-screen Admin Console for Authorized Admins
   if (currentRoute === "admin" && userRole === "admin") {
     return (
@@ -1191,8 +1082,8 @@ export default function App() {
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-[200]">
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="w-full max-w-lg">
               <UserProfileModal user={user} userRole={userRole} userStatus={userStatus}
-                onClose={() => setShowProfileModal(false)}
-                onLogout={async () => { setShowProfileModal(false); await getSupabase().auth.signOut(); }} />
+                authToken={authToken} calls={calls}
+                onClose={() => setShowProfileModal(false)} />
             </motion.div>
           </div>
         )}

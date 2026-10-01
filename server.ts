@@ -94,7 +94,11 @@ async function startServer() {
     res.json({ status: "ok", time: new Date().toISOString() });
   });
 
-  // Supabase connection diagnostic endpoint
+  // ─── Fixed owner account (single-user app, no login) ─────────────────
+const OWNER_UID = "a357b679-767d-48df-9316-c75a4616061b";
+const OWNER_EMAIL = "dahsorlahcohle@gmail.com";
+
+// Supabase connection diagnostic endpoint
   app.get("/api/supabase/health", async (req, res) => {
     try {
       // Query session configuration/auth to test basic connectivity
@@ -114,44 +118,30 @@ async function startServer() {
     }
   });
 
-  // Token authentication middleware
+  // ─── Single-owner mode ─────────────────────────────────────────────
+  // The app has no login screen. Every request is treated as the fixed
+  // owner account. Authorization headers are accepted but not verified.
   const authenticateUser = async (req: any, res: any, next: any) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ success: false, error: "Unauthorized: Missing token" });
-    }
-    const token = authHeader.split("Bearer ")[1];
     try {
-      const supabaseAdmin = getSupabaseAdmin();
-      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-      if (error || !user) {
-        throw new Error(error?.message || "Invalid Supabase token");
-      }
-
-      // Try to fetch profile from database fallback layer
-      const profile = await getUser(user.id);
-
-      const isDefaultAdmin = user.email === "dahsorlahcohle@gmail.com";
-      let role = isDefaultAdmin ? "admin" : "user";
-      let status = "active";
-
-      if (profile) {
-        role = profile.role || role;
-        status = profile.status || status;
+      // Try to fetch profile from database (for role/status overrides)
+      let profile = null;
+      try {
+        profile = await getUser(OWNER_UID);
+      } catch (e) {
+        // Profile row may not exist yet; defaults below apply
       }
 
       req.user = {
-        uid: user.id,
-        email: user.email,
-        displayName: user.user_metadata?.displayName || user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
-        role,
-        status
+        uid: OWNER_UID,
+        email: OWNER_EMAIL,
+        displayName: "Dahsorlah",
+        role: (profile && profile.role) || "admin",
+        status: (profile && profile.status) || "active"
       };
-      req.token = token;
       next();
     } catch (err: any) {
-      console.error("Token verification failed:", err.message);
-      return res.status(401).json({ success: false, error: "Unauthorized: Invalid token" });
+      console.error("Owner resolution failed:", err.message);
+      return res.status(401).json({ success: false, error: "Unauthorized" });
     }
   };
 
@@ -584,9 +574,7 @@ async function startServer() {
     let geminiSession: any = null;
     let isConnectingGemini = false;
 
-    // Extract authorization token from query string
     const url = new URL(request.url || "", `http://${request.headers.host || "localhost"}`);
-    const token = url.searchParams.get("token");
 
     const sendError = (msg: string) => {
       if (ws.readyState === WebSocket.OPEN) {
@@ -600,32 +588,13 @@ async function startServer() {
       }
     };
 
-    if (!token) {
-      console.log("WebSocket rejected: Missing token");
-      sendError("Authentication required: Missing token.");
-      ws.close(1008, "Missing Token");
-      return;
-    }
+    // Single-owner mode: resolve the fixed owner account, no token verification
+    const decodedUser: any = {
+      uid: OWNER_UID,
+      email: OWNER_EMAIL
+    };
 
-    let decodedUser: any = null;
-    try {
-      const supabaseAdmin = getSupabaseAdmin();
-      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-      if (error || !user) {
-        throw new Error(error?.message || "Invalid Supabase token");
-      }
-      decodedUser = {
-        uid: user.id,
-        email: user.email
-      };
-    } catch (err: any) {
-      console.log("WebSocket rejected: Invalid token:", err.message);
-      sendError("Authentication failed: Invalid token.");
-      ws.close(1008, "Invalid Token");
-      return;
-    }
-
-    console.log(`WebSocket user authenticated: ${decodedUser.email} (${decodedUser.uid})`);
+    console.log(`WebSocket connected (single-owner mode): ${decodedUser.email} (${decodedUser.uid})`);
 
     // Verify user is not suspended
     try {

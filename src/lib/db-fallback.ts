@@ -1,46 +1,25 @@
 import { getSupabaseAdmin } from "./supabase-admin";
-import { adminDb } from "./firebase-admin";
 
-// Utility to catch Supabase failures and fall back to Firestore
-async function runWithFallback<T>(
+// Supabase-only data runner (single-owner app; the Firestore fallback layer
+// has been removed -- the live Supabase schema is complete and authoritative).
+async function runSupabaseOnly<T>(
   supabaseOp: () => Promise<{ data: T | null; error: any }>,
-  firestoreOp: () => Promise<T>,
   opName: string
 ): Promise<T> {
-  try {
-    const supabase = getSupabaseAdmin();
-    // Test if supabase client is active
-    if (!supabase) {
-      throw new Error("Supabase client is not initialized");
-    }
-    const { data, error } = await supabaseOp();
-    if (error) {
-      // Check if it is a missing table error
-      if (
-        error.message?.includes("cache") || 
-        error.message?.includes("relation") || 
-        error.code === "P0001" || 
-        error.status === 404
-      ) {
-        console.warn(`[DB-FALLBACK] Supabase table missing/error for "${opName}". Falling back to Firestore. Error: ${error.message}`);
-        return await firestoreOp();
-      }
-      throw error;
-    }
-    if (data === null || data === undefined) {
-      // If we got null from supabase but it succeeded, that's fine, return it
-      return data as T;
-    }
-    return data;
-  } catch (err: any) {
-    console.warn(`[DB-FALLBACK] Supabase failed for "${opName}" (${err.message}). Falling back to Firestore.`);
-    try {
-      return await firestoreOp();
-    } catch (fsErr: any) {
-      console.error(`[DB-FALLBACK] Firestore also failed for "${opName}":`, fsErr.message);
-      throw fsErr;
-    }
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    throw new Error("Supabase client is not initialized");
   }
+  const { data, error } = await supabaseOp();
+  if (error) {
+    // .single() with zero rows is "not found", not a failure
+    if (error.code === "PGRST116" || /0 rows|multiple \(or no\) rows/i.test(error.message || "")) {
+      return (data ?? null) as T;
+    }
+    console.error(`[DB] Supabase failed for "${opName}": ${error.message}`);
+    throw error;
+  }
+  return (data ?? null) as T;
 }
 
 // Contacts Operations
@@ -55,8 +34,7 @@ export interface Contact {
 }
 
 export async function saveUser(uid: string, email: string, displayName: string, role = "user", status = "active") {
-  return runWithFallback(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("users")
@@ -64,26 +42,11 @@ export async function saveUser(uid: string, email: string, displayName: string, 
         .select()
         .single();
       return { data, error };
-    },
-    async () => {
-      const docRef = adminDb.collection("users").doc(uid);
-      await docRef.set({
-        id: uid,
-        email,
-        display_name: displayName,
-        role,
-        status,
-        updated_at: new Date().toISOString()
-      }, { merge: true });
-      return { id: uid, email, display_name: displayName, role, status };
-    },
-    "saveUser"
-  );
+    }, "saveUser");
 }
 
 export async function getUser(uid: string) {
-  return runWithFallback(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("users")
@@ -91,14 +54,7 @@ export async function getUser(uid: string) {
         .eq("id", uid)
         .single();
       return { data, error };
-    },
-    async () => {
-      const doc = await adminDb.collection("users").doc(uid).get();
-      if (!doc.exists) return null;
-      return doc.data();
-    },
-    "getUser"
-  );
+    }, "getUser");
 }
 
 export async function createContact(userId: string, name: string, company: string, phone: string, notes: string): Promise<Contact> {
@@ -111,8 +67,7 @@ export async function createContact(userId: string, name: string, company: strin
     created_at: new Date().toISOString()
   };
 
-  return runWithFallback<Contact>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("contacts")
@@ -120,18 +75,11 @@ export async function createContact(userId: string, name: string, company: strin
         .select()
         .single();
       return { data: data as Contact, error };
-    },
-    async () => {
-      const docRef = await adminDb.collection("contacts").add(newContact);
-      return { id: docRef.id, ...newContact };
-    },
-    "createContact"
-  );
+    }, "createContact");
 }
 
 export async function listContacts(userId: string): Promise<Contact[]> {
-  return runWithFallback<Contact[]>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("contacts")
@@ -139,20 +87,7 @@ export async function listContacts(userId: string): Promise<Contact[]> {
         .eq("user_id", userId)
         .order("name", { ascending: true });
       return { data: data as Contact[], error };
-    },
-    async () => {
-      const snapshot = await adminDb
-        .collection("contacts")
-        .where("user_id", "==", userId)
-        .get();
-      const list: Contact[] = [];
-      snapshot.forEach(doc => {
-        list.push({ id: doc.id, ...doc.data() } as Contact);
-      });
-      return list.sort((a, b) => a.name.localeCompare(b.name));
-    },
-    "listContacts"
-  );
+    }, "listContacts");
 }
 
 // Resolves a requested contactId to a real, existing contact for this user --
@@ -211,8 +146,7 @@ export async function createCallSession(userId: string, contactId: string | null
     created_at: new Date().toISOString()
   };
 
-  return runWithFallback<CallSession>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("call_sessions")
@@ -220,13 +154,7 @@ export async function createCallSession(userId: string, contactId: string | null
         .select()
         .single();
       return { data: data as CallSession, error };
-    },
-    async () => {
-      const docRef = await adminDb.collection("call_sessions").add(newSession);
-      return { id: docRef.id, ...newSession } as CallSession;
-    },
-    "createCallSession"
-  );
+    }, "createCallSession");
 }
 
 export async function updateCallSession(callId: string, durationSeconds: number, endedAt: string, aiNotes?: string): Promise<void> {
@@ -239,25 +167,18 @@ export async function updateCallSession(callId: string, durationSeconds: number,
     updateData.ai_notes = aiNotes;
   }
 
-  return runWithFallback<void>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { error } = await supabase
         .from("call_sessions")
         .update(updateData)
         .eq("id", callId);
       return { data: undefined, error };
-    },
-    async () => {
-      await adminDb.collection("call_sessions").doc(callId).update(updateData);
-    },
-    "updateCallSession"
-  );
+    }, "updateCallSession");
 }
 
 export async function listCallSessions(userId: string): Promise<CallSession[]> {
-  return runWithFallback<CallSession[]>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       // Try to fetch call sessions with contacts joined
       const { data, error } = await supabase
@@ -279,50 +200,11 @@ export async function listCallSessions(userId: string): Promise<CallSession[]> {
       })) as CallSession[];
 
       return { data: mapped, error };
-    },
-    async () => {
-      // Step 1: Get all call sessions
-      const sessionsSnap = await adminDb
-        .collection("call_sessions")
-        .where("user_id", "==", userId)
-        .get();
-      
-      const sessions: any[] = [];
-      sessionsSnap.forEach(doc => {
-        sessions.push({ id: doc.id, ...doc.data() });
-      });
-
-      // Step 2: Get all contacts to map contact names
-      const contactsSnap = await adminDb
-        .collection("contacts")
-        .where("user_id", "==", userId)
-        .get();
-      
-      const contactsMap: { [id: string]: { name: string; company: string } } = {};
-      contactsSnap.forEach(doc => {
-        contactsMap[doc.id] = doc.data() as any;
-      });
-
-      // Step 3: Map contacts onto sessions
-      const mapped = sessions.map(session => {
-        const contact = session.contact_id ? contactsMap[session.contact_id] : null;
-        return {
-          ...session,
-          contact_name: contact?.name || "Unknown",
-          contact_company: contact?.company || ""
-        };
-      });
-
-      // Sort descending
-      return mapped.sort((a, b) => b.created_at.localeCompare(a.created_at)) as CallSession[];
-    },
-    "listCallSessions"
-  );
+    }, "listCallSessions");
 }
 
 export async function listAllCallSessionsForAdmin(): Promise<CallSession[]> {
-  return runWithFallback<CallSession[]>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("call_sessions")
@@ -342,33 +224,7 @@ export async function listAllCallSessionsForAdmin(): Promise<CallSession[]> {
       })) as CallSession[];
 
       return { data: mapped, error };
-    },
-    async () => {
-      const sessionsSnap = await adminDb.collection("call_sessions").get();
-      const sessions: any[] = [];
-      sessionsSnap.forEach(doc => {
-        sessions.push({ id: doc.id, ...doc.data() });
-      });
-
-      const contactsSnap = await adminDb.collection("contacts").get();
-      const contactsMap: { [id: string]: { name: string; company: string } } = {};
-      contactsSnap.forEach(doc => {
-        contactsMap[doc.id] = doc.data() as any;
-      });
-
-      const mapped = sessions.map(session => {
-        const contact = session.contact_id ? contactsMap[session.contact_id] : null;
-        return {
-          ...session,
-          contact_name: contact?.name || "Unknown",
-          contact_company: contact?.company || ""
-        };
-      });
-
-      return mapped.sort((a, b) => b.created_at.localeCompare(a.created_at)) as CallSession[];
-    },
-    "listAllCallSessionsForAdmin"
-  );
+    }, "listAllCallSessionsForAdmin");
 }
 
 // Transcript Messages Operations
@@ -383,8 +239,7 @@ export interface TranscriptMessage {
 export async function saveTranscriptMessages(callSessionId: string, messages: TranscriptMessage[]): Promise<void> {
   if (!messages || messages.length === 0) return;
 
-  return runWithFallback<void>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const rows = messages.map(m => ({
         call_session_id: callSessionId,
@@ -396,29 +251,11 @@ export async function saveTranscriptMessages(callSessionId: string, messages: Tr
         .from("transcript_messages")
         .insert(rows);
       return { data: undefined, error };
-    },
-    async () => {
-      const batch = adminDb.batch();
-      const collectionRef = adminDb.collection("transcript_messages");
-      
-      for (const m of messages) {
-        const docRef = collectionRef.doc();
-        batch.set(docRef, {
-          call_session_id: callSessionId,
-          speaker: m.speaker,
-          message: m.message,
-          timestamp: m.timestamp || new Date().toISOString()
-        });
-      }
-      await batch.commit();
-    },
-    "saveTranscriptMessages"
-  );
+    }, "saveTranscriptMessages");
 }
 
 export async function listTranscriptMessages(callSessionId: string): Promise<TranscriptMessage[]> {
-  return runWithFallback<TranscriptMessage[]>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("transcript_messages")
@@ -426,21 +263,7 @@ export async function listTranscriptMessages(callSessionId: string): Promise<Tra
         .eq("call_session_id", callSessionId)
         .order("timestamp", { ascending: true });
       return { data: data as TranscriptMessage[], error };
-    },
-    async () => {
-      const snapshot = await adminDb
-        .collection("transcript_messages")
-        .where("call_session_id", "==", callSessionId)
-        .get();
-      const list: TranscriptMessage[] = [];
-      snapshot.forEach(doc => {
-        list.push({ id: doc.id, ...doc.data() } as TranscriptMessage);
-      });
-      // Sort by timestamp
-      return list.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    },
-    "listTranscriptMessages"
-  );
+    }, "listTranscriptMessages");
 }
 
 // Conversation Memory: fetch a contact's last completed call + transcript so the
@@ -456,8 +279,7 @@ export async function getLastConversationForContact(
   contactId: string,
   excludeCallSessionId?: string
 ): Promise<ConversationMemory | null> {
-  const lastSession = await runWithFallback<CallSession | null>(
-    async () => {
+  const lastSession = await runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       let query = supabase
         .from("call_sessions")
@@ -471,23 +293,7 @@ export async function getLastConversationForContact(
       if (error) return { data: null, error };
       const filtered = (data || []).filter((s: any) => s.id !== excludeCallSessionId);
       return { data: (filtered[0] as CallSession) || null, error: null };
-    },
-    async () => {
-      const snap = await adminDb
-        .collection("call_sessions")
-        .where("user_id", "==", userId)
-        .where("contact_id", "==", contactId)
-        .where("status", "==", "completed")
-        .get();
-      const sessions: any[] = [];
-      snap.forEach(doc => sessions.push({ id: doc.id, ...doc.data() }));
-      const filtered = sessions
-        .filter(s => s.id !== excludeCallSessionId)
-        .sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return (filtered[0] as CallSession) || null;
-    },
-    "getLastConversationForContact"
-  );
+    }, "getLastConversationForContact");
 
   if (!lastSession || !lastSession.id) return null;
 
@@ -528,19 +334,13 @@ export async function addAICommand(callSessionId: string, command: string): Prom
     created_at: new Date().toISOString()
   };
 
-  return runWithFallback<void>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { error } = await supabase
         .from("ai_commands")
         .insert(row);
       return { data: undefined, error };
-    },
-    async () => {
-      await adminDb.collection("ai_commands").add(row);
-    },
-    "addAICommand"
-  );
+    }, "addAICommand");
 }
 
 // User Preferences Operations
@@ -559,8 +359,7 @@ export async function getPreferences(userId: string): Promise<UserPreferences> {
     ai_speed: 1.0
   };
 
-  return runWithFallback<UserPreferences>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("user_preferences")
@@ -568,30 +367,17 @@ export async function getPreferences(userId: string): Promise<UserPreferences> {
         .eq("user_id", userId)
         .single();
       return { data: data as UserPreferences || defaultPrefs, error };
-    },
-    async () => {
-      const doc = await adminDb.collection("user_preferences").doc(userId).get();
-      if (!doc.exists) return defaultPrefs;
-      return { ...defaultPrefs, ...doc.data() };
-    },
-    "getPreferences"
-  );
+    }, "getPreferences");
 }
 
 export async function updatePreferences(userId: string, prefs: Partial<UserPreferences>): Promise<void> {
-  return runWithFallback<void>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { error } = await supabase
         .from("user_preferences")
         .upsert({ user_id: userId, ...prefs }, { onConflict: "user_id" });
       return { data: undefined, error };
-    },
-    async () => {
-      await adminDb.collection("user_preferences").doc(userId).set(prefs, { merge: true });
-    },
-    "updatePreferences"
-  );
+    }, "updatePreferences");
 }
 
 // Admin / Audit Logging Operations
@@ -624,24 +410,17 @@ export async function addAdminLog(
     timestamp: new Date().toISOString()
   };
 
-  return runWithFallback<void>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { error } = await supabase
         .from("admin_logs")
         .insert(row);
       return { data: undefined, error };
-    },
-    async () => {
-      await adminDb.collection("admin_logs").add(row);
-    },
-    "addAdminLog"
-  );
+    }, "addAdminLog");
 }
 
 export async function listAllAdminLogs(): Promise<AdminLog[]> {
-  return runWithFallback<AdminLog[]>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("admin_logs")
@@ -649,63 +428,29 @@ export async function listAllAdminLogs(): Promise<AdminLog[]> {
         .order("timestamp", { ascending: false })
         .limit(100);
       return { data: data as AdminLog[], error };
-    },
-    async () => {
-      const snapshot = await adminDb
-        .collection("admin_logs")
-        .orderBy("timestamp", "desc")
-        .limit(100)
-        .get();
-      const list: AdminLog[] = [];
-      snapshot.forEach(doc => {
-        list.push({ id: doc.id, ...doc.data() } as AdminLog);
-      });
-      return list;
-    },
-    "listAllAdminLogs"
-  );
+    }, "listAllAdminLogs");
 }
 
 export async function listAllUsers(): Promise<any[]> {
-  return runWithFallback<any[]>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("users")
         .select("*")
         .order("created_at", { ascending: false });
       return { data, error };
-    },
-    async () => {
-      const snapshot = await adminDb.collection("users").get();
-      const list: any[] = [];
-      snapshot.forEach(doc => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
-      return list.sort((a, b) => b.updated_at?.localeCompare(a.updated_at || "") || 0);
-    },
-    "listAllUsers"
-  );
+    }, "listAllUsers");
 }
 
 export async function updateUserStatus(targetUid: string, status: string): Promise<void> {
-  return runWithFallback<void>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { error } = await supabase
         .from("users")
         .update({ status, updated_at: new Date().toISOString() })
         .eq("id", targetUid);
       return { data: undefined, error };
-    },
-    async () => {
-      await adminDb.collection("users").doc(targetUid).update({
-        status,
-        updated_at: new Date().toISOString()
-      });
-    },
-    "updateUserStatus"
-  );
+    }, "updateUserStatus");
 }
 
 
@@ -741,8 +486,7 @@ export async function createPersonality(
     voice_id: voiceId,
     created_at: new Date().toISOString()
   };
-  return runWithFallback<Personality>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("personalities")
@@ -750,18 +494,11 @@ export async function createPersonality(
         .select()
         .single();
       return { data: data as Personality, error };
-    },
-    async () => {
-      const docRef = await adminDb.collection("personalities").add(record);
-      return { id: docRef.id, ...record };
-    },
-    "createPersonality"
-  );
+    }, "createPersonality");
 }
 
 export async function listPersonalities(userId: string): Promise<Personality[]> {
-  return runWithFallback<Personality[]>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("personalities")
@@ -769,15 +506,7 @@ export async function listPersonalities(userId: string): Promise<Personality[]> 
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
       return { data: data as Personality[], error };
-    },
-    async () => {
-      const snap = await adminDb.collection("personalities").where("user_id", "==", userId).get();
-      const list: Personality[] = [];
-      snap.forEach(doc => list.push({ id: doc.id, ...doc.data() } as Personality));
-      return list;
-    },
-    "listPersonalities"
-  );
+    }, "listPersonalities");
 }
 
 export async function updatePersonality(
@@ -785,8 +514,7 @@ export async function updatePersonality(
   userId: string,
   updates: Partial<Omit<Personality, "id" | "user_id" | "created_at">>
 ): Promise<Personality> {
-  return runWithFallback<Personality>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("personalities")
@@ -796,20 +524,11 @@ export async function updatePersonality(
         .select()
         .single();
       return { data: data as Personality, error };
-    },
-    async () => {
-      const docRef = adminDb.collection("personalities").doc(personalityId);
-      await docRef.update(updates);
-      const doc = await docRef.get();
-      return { id: doc.id, ...doc.data() } as Personality;
-    },
-    "updatePersonality"
-  );
+    }, "updatePersonality");
 }
 
 export async function deletePersonality(personalityId: string, userId: string): Promise<void> {
-  return runWithFallback<void>(
-    async () => {
+  return runSupabaseOnly(async () => {
       const supabase = getSupabaseAdmin();
       const { error } = await supabase
         .from("personalities")
@@ -817,12 +536,7 @@ export async function deletePersonality(personalityId: string, userId: string): 
         .eq("id", personalityId)
         .eq("user_id", userId);
       return { data: undefined, error };
-    },
-    async () => {
-      await adminDb.collection("personalities").doc(personalityId).delete();
-    },
-    "deletePersonality"
-  );
+    }, "deletePersonality");
 }
 
 export function buildPersonalitySystemPrompt(p: Personality, callTopic?: string): string {

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { getSupabase } from "../lib/supabase";
 import { 
   User, 
   Settings, 
@@ -22,10 +21,11 @@ interface UserProfileModalProps {
   userRole: string;
   userStatus: string;
   onClose: () => void;
-  onLogout: () => void;
+  authToken: string;
+  calls: any[];
 }
 
-export default function UserProfileModal({ user, userRole, userStatus, onClose, onLogout }: UserProfileModalProps) {
+export default function UserProfileModal({ user, userRole, userStatus, onClose, authToken, calls }: UserProfileModalProps) {
   const [activeTab, setActiveTab] = useState<"profile" | "history">("profile");
   
   // Profile settings state
@@ -40,33 +40,28 @@ export default function UserProfileModal({ user, userRole, userStatus, onClose, 
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
-  // Fetch personal call history directly from client Supabase
+  // Fetch personal call history from the app API (owner account)
   const fetchPersonalHistory = async () => {
-    if (!user) return;
+    if (!authToken) return;
     setHistoryLoading(true);
     try {
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from("voice_sessions")
-        .select("*")
-        .eq("user_id", user.uid)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      const list = (data || []).map((row: any) => ({
-        id: row.id,
-        uid: row.user_id,
-        userEmail: row.user_email,
-        voiceId: row.selected_voice,
-        status: row.status,
-        durationSeconds: row.duration_seconds,
-        createdAt: row.created_at,
-        endedAt: row.ended_at
-      }));
-      setPersonalCalls(list);
+      const response = await fetch("/api/calls", {
+        headers: { "Authorization": `Bearer ${authToken}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        const list = (data.calls || []).map((row: any) => ({
+          id: row.id,
+          voiceId: row.personality_name || row.selected_voice || "AI",
+          status: row.status,
+          durationSeconds: row.duration_seconds,
+          createdAt: row.created_at,
+          endedAt: row.ended_at
+        }));
+        setPersonalCalls(list);
+      }
     } catch (err) {
-      console.error("Failed to fetch personal history from Supabase client:", err);
+      console.error("Failed to fetch personal call history:", err);
     } finally {
       setHistoryLoading(false);
     }
@@ -78,46 +73,10 @@ export default function UserProfileModal({ user, userRole, userStatus, onClose, 
     }
   }, [activeTab]);
 
+  // Single-owner mode: profile is read-only (no auth system to update)
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setMsg(null);
-
-    try {
-      const supabase = getSupabase();
-
-      // 1. Update display name if changed
-      if (displayName !== user?.displayName) {
-        // Update Supabase Auth
-        const { error: sbErr } = await supabase.auth.updateUser({
-          data: {
-            displayName,
-            full_name: displayName
-          }
-        });
-        if (sbErr) throw sbErr;
-      }
-
-      // 2. Update password if filled
-      if (newPassword) {
-        if (newPassword.length < 6) {
-          throw new Error("Password must be at least 6 characters long.");
-        }
-        // Update Supabase Auth
-        const { error: sbErr } = await supabase.auth.updateUser({
-          password: newPassword
-        });
-        if (sbErr) throw sbErr;
-        setNewPassword("");
-      }
-
-      setMsg({ text: "Profile settings updated successfully!", type: "success" });
-    } catch (err: any) {
-      console.error("Profile update failed:", err);
-      setMsg({ text: err.message || "Failed to update profile", type: "error" });
-    } finally {
-      setLoading(false);
-    }
+    setMsg({ text: "Account details are fixed in single-owner mode.", type: "error" });
   };
 
   const formatDuration = (seconds: number) => {
@@ -217,74 +176,45 @@ export default function UserProfileModal({ user, userRole, userStatus, onClose, 
 
         <AnimatePresence mode="wait">
           
-          {/* Tab 1: Profile Form */}
+          {/* Tab 1: Account Info (read-only in single-owner mode) */}
           {activeTab === "profile" && (
-            <motion.form
-              key="profile-form"
+            <motion.div
+              key="profile-info"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              onSubmit={handleUpdateProfile}
               className="space-y-4"
             >
+              {msg && (
+                <div className={`mb-5 p-3.5 border rounded-2xl flex items-start gap-2.5 text-xs ${
+                  msg.type === "success"
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                    : "bg-rose-500/10 border-rose-500/20 text-rose-300"
+                }`}>
+                  {msg.type === "success" ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <Shield className="w-4 h-4 mt-0.5 shrink-0" />}
+                  <span>{msg.text}</span>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
                   Full Display Name
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Your display name"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full bg-black/40 border border-white/5 rounded-xl py-3 px-4 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/40"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
-                  Update Password (Optional)
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                    <Lock className="w-4 h-4" />
-                  </span>
-                  <input
-                    type="password"
-                    placeholder="Leave blank to keep unchanged"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-black/40 border border-white/5 rounded-xl py-3 pl-10 pr-4 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/40"
-                  />
+                <div className="w-full bg-black/40 border border-white/5 rounded-xl py-3 px-4 text-xs text-slate-200">
+                  {user?.displayName || "Dahsorlah"}
                 </div>
               </div>
-
-              <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-white/5 mt-6">
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="px-4 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Log Out of Node
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
-                >
-                  {loading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      Save Changes
-                    </>
-                  )}
-                </button>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block ml-1">
+                  Email
+                </label>
+                <div className="w-full bg-black/40 border border-white/5 rounded-xl py-3 px-4 text-xs text-slate-400 font-mono">
+                  {user?.email}
+                </div>
               </div>
-            </motion.form>
+              <p className="text-[10px] text-slate-500 italic">
+                This app runs in single-owner mode — account details are fixed and no login is required.
+              </p>
+            </motion.div>
           )}
 
           {/* Tab 2: Personal Call History */}
